@@ -15,14 +15,14 @@
                 extend: {
                     colors: {
                         cream: 'transparent',
-                        surface: 'rgba(20, 20, 35, 0.7)',
-                        border: { DEFAULT: 'rgba(255,255,255,0.1)', light: 'rgba(255,255,255,0.06)', input: 'rgba(255,255,255,0.2)' },
-                        accent: '#3B82F6',
-                        text: { primary: '#FFFFFF', mid: 'rgba(255,255,255,0.6)', dim: 'rgba(255,255,255,0.4)' },
+                        surface: 'rgba(255, 255, 255, 0.72)',
+                        border: { DEFAULT: 'rgba(0,0,0,0.06)', light: 'rgba(0,0,0,0.04)', input: 'rgba(0,0,0,0.12)' },
+                        accent: '#2563eb',
+                        text: { primary: '#1a1a1a', mid: '#555550', dim: '#8a877f' },
                         fn: {
-                            green: '#34D399', 'green-bg': 'rgba(52,211,153,0.15)',
-                            red: '#F87171', 'red-bg': 'rgba(248,113,113,0.15)',
-                            blue: '#60A5FA', 'blue-bg': 'rgba(96,165,250,0.15)',
+                            green: '#1a7a4c', 'green-bg': '#e8f5ee',
+                            red: '#c0392b', 'red-bg': '#fceaea',
+                            blue: '#2563a0', 'blue-bg': '#e8f0fa',
                         },
                         fb: '#1877f2',
                     }
@@ -34,58 +34,43 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            font-size: 14px; line-height: 1.5; color: #fff; min-height: 100vh;
+            font-size: 14px; line-height: 1.5; color: #1a1a1a; min-height: 100vh;
+            background: #f4f2ee;
         }
-        /* Blurred background image */
-        body::before {
-            content: ''; position: fixed; inset: -20px; z-index: -1;
-            background: url('https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=1920&q=80') center/cover no-repeat;
-            filter: blur(25px) brightness(0.35) saturate(1.2);
-            transform: scale(1.05);
-        }
-        /* Dark overlay for consistent readability */
-        body::after {
-            content: ''; position: fixed; inset: 0; z-index: -1;
-            background: rgba(10, 15, 30, 0.4);
-        }
+        body::before { display: none; }
+        body::after { display: none; }
 
-        /* Glass utility classes */
+        /* Glass utility classes — light theme */
         .glass {
-            background: rgba(20, 20, 35, 0.7);
-            backdrop-filter: blur(20px) saturate(1.2);
-            -webkit-backdrop-filter: blur(20px) saturate(1.2);
-            border: 1px solid rgba(255,255,255,0.1);
+            background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.06);
             border-radius: 16px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
         }
         .glass-pill {
-            background: rgba(20, 20, 35, 0.75);
-            backdrop-filter: blur(24px) saturate(1.3);
-            -webkit-backdrop-filter: blur(24px) saturate(1.3);
-            border: 1px solid rgba(255,255,255,0.12);
+            background: #ffffff;
+            border: 1px solid rgba(0,0,0,0.06);
             border-radius: 24px;
-            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .glass-subtle {
-            background: rgba(255,255,255,0.05);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.06);
             border-radius: 12px;
         }
 
         ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-track { background: rgba(255,255,255,0.03); }
-        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+        ::-webkit-scrollbar-track { background: rgba(0,0,0,0.02); }
+        ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.2); }
 
         :focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; border-radius: 4px; }
         button:focus-visible, a:focus-visible { outline: 2px solid #3B82F6; outline-offset: 2px; }
 
         button, .upload-box, .tab-btn, .filter-btn, .toggle-track { transition: all 0.2s ease; }
 
-        .upload-box:hover { border-color: rgba(59,130,246,0.5) !important; background: rgba(59,130,246,0.08) !important; }
-        .upload-box.drag-over { border-color: rgba(59,130,246,0.7) !important; background: rgba(59,130,246,0.12) !important; }
+        .upload-box:hover { border-color: rgba(37,99,235,0.4) !important; background: rgba(37,99,235,0.04) !important; }
+        .upload-box.drag-over { border-color: rgba(37,99,235,0.6) !important; background: rgba(37,99,235,0.08) !important; }
 
         .safe-zone-overlay { position: absolute; inset: 0; pointer-events: none; z-index: 10; display: none; }
         .safe-zone-overlay.active { display: block; }
@@ -110,9 +95,9 @@
 
         .toggle-track {
             width: 40px; height: 22px; border-radius: 11px;
-            background: rgba(255,255,255,0.15); position: relative; cursor: pointer; transition: background 0.2s;
+            background: rgba(0,0,0,0.12); position: relative; cursor: pointer; transition: background 0.2s;
         }
-        .toggle-track.on { background: #3B82F6; }
+        .toggle-track.on { background: #2563eb; }
         .toggle-knob {
             width: 16px; height: 16px; border-radius: 50%; background: white;
             position: absolute; top: 3px; transition: 0.2s;
@@ -172,7 +157,7 @@
         }
 
         .export-overlay {
-            position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100;
+            position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 100;
             display: none; align-items: center; justify-content: center;
         }
         .export-overlay.active { display: flex; }
@@ -195,32 +180,32 @@
         }
         .scroll-hint-left {
             left: 0;
-            background: linear-gradient(to right, rgba(5,10,25,0.9) 0%, rgba(5,10,25,0.5) 50%, transparent 100%);
+            background: linear-gradient(to right, rgba(244,242,238,0.95) 0%, rgba(244,242,238,0.5) 50%, transparent 100%);
             opacity: 1;
         }
         .scroll-hint-right {
             right: 0;
-            background: linear-gradient(to left, rgba(5,10,25,0.9) 0%, rgba(5,10,25,0.5) 50%, transparent 100%);
+            background: linear-gradient(to left, rgba(244,242,238,0.95) 0%, rgba(244,242,238,0.5) 50%, transparent 100%);
             opacity: 0;
         }
         .scroll-hint.hidden { opacity: 0; }
         .scroll-hint.visible { opacity: 1; }
         .scroll-hint-arrow {
             width: 28px; height: 28px; border-radius: 50%;
-            background: rgba(255,255,255,0.2); display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center;
             pointer-events: auto; cursor: pointer; backdrop-filter: blur(4px);
-            border: 1px solid rgba(255,255,255,0.15);
+            border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 1px 4px rgba(0,0,0,0.1);
             animation: pulse-hint 2s ease-in-out infinite;
         }
-        .scroll-hint-arrow:hover { background: rgba(255,255,255,0.35); animation: none; }
-        .scroll-hint-arrow svg { opacity: 0.9; }
+        .scroll-hint-arrow:hover { background: rgba(255,255,255,1); animation: none; }
+        .scroll-hint-arrow svg { opacity: 0.6; color: #1a1a1a; }
         @keyframes pulse-hint {
             0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255,255,255,0.15); }
             50% { transform: scale(1.1); box-shadow: 0 0 0 6px rgba(255,255,255,0); }
         }
 
         /* Section titles */
-        .section-title { color: rgba(255,255,255,0.9); font-weight: 600; }
+        .section-title { color: #1a1a1a; font-weight: 600; }
 
         /* Accessibility: respect reduced motion preference */
         @media (prefers-reduced-motion: reduce) {
@@ -245,16 +230,16 @@
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
         }
-        body.export-mode .glass { background: rgba(15, 20, 40, 0.95) !important; }
-        body.export-mode .glass-pill { background: rgba(15, 20, 40, 0.95) !important; }
-        body.export-mode .glass-subtle { background: rgba(25, 30, 50, 0.9) !important; }
+        body.export-mode .glass { background: #ffffff !important; }
+        body.export-mode .glass-pill { background: #ffffff !important; }
+        body.export-mode .glass-subtle { background: #f5f5f0 !important; }
         body.export-mode .scroll-hint { display: none !important; }
         body.export-mode .placement-row-scroll { overflow: visible !important; flex-wrap: wrap !important; gap: 12px !important; }
         body.export-mode #export-img-btn { display: none !important; }
 
         /* Print styles */
         @media print {
-            body { background: #111 !important; }
+            body { background: #f4f2ee !important; }
             body::before { display: none !important; }
             header, .upload-box, .toggle-track, #export-img-btn, .carousel-nav, .filter-btn, #gdn-filter { display: none !important; }
             .placement-row-scroll { overflow: visible !important; flex-wrap: wrap !important; }
@@ -279,13 +264,13 @@
         }
     </style>
 </head>
-<body class="min-h-screen text-white">
+<body class="min-h-screen">
 
     <!-- Header -->
     <header class="glass-pill mx-4 mt-4 px-6 py-3 flex items-center justify-between">
-        <h1 class="text-lg font-semibold text-white">בדיקת Safe Zone למודעות</h1>
+        <h1 class="text-lg font-semibold" style="color: #1a1a1a;">בדיקת Safe Zone למודעות</h1>
         <div class="flex items-center gap-3">
-            <button id="export-img-btn" onclick="exportAsPDF()" aria-label="ייצוא PDF" class="px-4 py-1.5 bg-accent text-white text-[12px] rounded-full font-medium hover:bg-blue-600 transition-colors hidden">
+            <button id="export-img-btn" onclick="exportAsPDF()" aria-label="ייצוא PDF" class="px-4 py-1.5 bg-accent text-white text-[12px] rounded-full font-medium hover:bg-blue-700 transition-colors hidden">
                 <span dir="ltr">PDF</span> ייצוא
             </button>
             <div class="flex" dir="ltr">
@@ -300,49 +285,49 @@
     </header>
 
     <!-- Notification -->
-    <div id="notification" class="fixed top-4 left-1/2 -translate-x-1/2 glass-pill text-white px-5 py-2.5 text-sm z-50 hidden" role="alert"></div>
+    <div id="notification" class="fixed top-4 left-1/2 -translate-x-1/2 glass-pill px-5 py-2.5 text-sm z-50 hidden" style="color: #1a1a1a;" role="alert"></div>
 
     <!-- ==================== FACEBOOK SECTION ==================== -->
     <div id="facebook-section" class="mx-auto px-4 py-5" style="max-width:100%;">
 
         <!-- Upload Area - compact inline -->
         <div class="flex gap-2 mb-4 items-center flex-wrap">
-            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(255,255,255,0.15)] px-3 py-2 cursor-pointer relative transition-all"
+            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(0,0,0,0.12)] px-3 py-2 cursor-pointer relative transition-all"
                  id="story-upload" onclick="document.getElementById('story-input').click()"
                  ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'story')">
-                <button class="absolute top-1 left-1 w-4 h-4 text-white/40 rounded text-[10px] leading-none hidden z-20 hover:text-white" onclick="event.stopPropagation(); clearMedia('story')" aria-label="Clear uploaded media">&times;</button>
-                <div id="story-icon"><svg class="text-white/40" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/></svg></div>
-                <div><div class="text-[12px] font-medium text-white">תמונה בודדת</div><div class="text-[10px] text-white/40">9:16</div></div>
+                <button class="absolute top-1 left-1 w-4 h-4 text-text-dim rounded text-[10px] leading-none hidden z-20 hover:text-red-500" onclick="event.stopPropagation(); clearMedia('story')" aria-label="Clear uploaded media">&times;</button>
+                <div id="story-icon"><svg class="text-text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="2" width="14" height="20" rx="2"/></svg></div>
+                <div><div class="text-[12px] font-medium text-text-primary">תמונה בודדת</div><div class="text-[10px] text-text-dim">9:16</div></div>
                 <input type="file" id="story-input" accept="image/*,video/*" class="hidden" onchange="handleUpload(event, 'story')">
                 <div id="story-preview-container" class="hidden"><img class="w-6 h-8 object-cover rounded" /></div>
             </div>
 
-            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(255,255,255,0.15)] px-3 py-2 cursor-pointer relative transition-all"
+            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(0,0,0,0.12)] px-3 py-2 cursor-pointer relative transition-all"
                  id="feed45-upload" onclick="document.getElementById('feed45-input').click()"
                  ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'feed45')">
-                <button class="absolute top-1 left-1 w-4 h-4 text-white/40 rounded text-[10px] leading-none hidden z-20 hover:text-white" onclick="event.stopPropagation(); clearMedia('feed45')" aria-label="Clear feed media">&times;</button>
-                <div id="feed45-icon"><svg class="text-white/40" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="18" height="20" rx="2"/></svg></div>
-                <div><div class="text-[12px] font-medium text-white">פיד 4:5</div><div class="text-[10px] text-white/40">1080×1350</div></div>
+                <button class="absolute top-1 left-1 w-4 h-4 text-text-dim rounded text-[10px] leading-none hidden z-20 hover:text-red-500" onclick="event.stopPropagation(); clearMedia('feed45')" aria-label="Clear feed media">&times;</button>
+                <div id="feed45-icon"><svg class="text-text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="18" height="20" rx="2"/></svg></div>
+                <div><div class="text-[12px] font-medium text-text-primary">פיד 4:5</div><div class="text-[10px] text-text-dim">1080×1350</div></div>
                 <input type="file" id="feed45-input" accept="image/*,video/*" class="hidden" onchange="handleUpload(event, 'feed45')">
                 <div id="feed45-preview-container" class="hidden"><img class="w-6 h-8 object-cover rounded" /></div>
             </div>
 
-            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(255,255,255,0.15)] px-3 py-2 cursor-pointer relative transition-all"
+            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(0,0,0,0.12)] px-3 py-2 cursor-pointer relative transition-all"
                  id="carousel-upload" onclick="document.getElementById('carousel-input').click()"
                  ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCarouselDrop(event)">
-                <button class="absolute top-1 left-1 w-4 h-4 text-white/40 rounded text-[10px] leading-none hidden z-20 hover:text-white" onclick="event.stopPropagation(); clearCarousel()" aria-label="Clear carousel images">&times;</button>
-                <div id="carousel-icon"><svg class="text-white/40" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="13" height="18" rx="2"/><rect x="9" y="3" width="13" height="18" rx="2"/></svg></div>
-                <div><div class="text-[12px] font-medium text-white">קרוסלה 9:16</div><div class="text-[10px] text-white/40">2-10</div></div>
+                <button class="absolute top-1 left-1 w-4 h-4 text-text-dim rounded text-[10px] leading-none hidden z-20 hover:text-red-500" onclick="event.stopPropagation(); clearCarousel()" aria-label="Clear carousel images">&times;</button>
+                <div id="carousel-icon"><svg class="text-text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="13" height="18" rx="2"/><rect x="9" y="3" width="13" height="18" rx="2"/></svg></div>
+                <div><div class="text-[12px] font-medium text-text-primary">קרוסלה 9:16</div><div class="text-[10px] text-text-dim">2-10</div></div>
                 <input type="file" id="carousel-input" accept="image/*" multiple class="hidden" onchange="handleCarouselUpload(event)">
                 <div id="carousel-preview-container" class="hidden flex gap-0.5"></div>
             </div>
 
-            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(255,255,255,0.15)] px-3 py-2 cursor-pointer relative transition-all"
+            <div class="upload-box glass-subtle flex items-center gap-2 border-dashed !border-[rgba(0,0,0,0.12)] px-3 py-2 cursor-pointer relative transition-all"
                  id="carousel-sq-upload" onclick="document.getElementById('carousel-sq-input').click()"
                  ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleCarouselSqDrop(event)">
-                <button class="absolute top-1 left-1 w-4 h-4 text-white/40 rounded text-[10px] leading-none hidden z-20 hover:text-white" onclick="event.stopPropagation(); clearCarouselSq()" aria-label="Clear feed carousel images">&times;</button>
-                <div id="carousel-sq-icon"><svg class="text-white/40" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="16" rx="2"/><rect x="10" y="4" width="12" height="16" rx="2"/></svg></div>
-                <div><div class="text-[12px] font-medium text-white">קרוסלה 1:1</div><div class="text-[10px] text-white/40">2-10</div></div>
+                <button class="absolute top-1 left-1 w-4 h-4 text-text-dim rounded text-[10px] leading-none hidden z-20 hover:text-red-500" onclick="event.stopPropagation(); clearCarouselSq()" aria-label="Clear feed carousel images">&times;</button>
+                <div id="carousel-sq-icon"><svg class="text-text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="16" rx="2"/><rect x="10" y="4" width="12" height="16" rx="2"/></svg></div>
+                <div><div class="text-[12px] font-medium text-text-primary">קרוסלה 1:1</div><div class="text-[10px] text-text-dim">2-10</div></div>
                 <input type="file" id="carousel-sq-input" accept="image/*" multiple class="hidden" onchange="handleCarouselSqUpload(event)">
                 <div id="carousel-sq-preview-container" class="hidden flex gap-0.5"></div>
             </div>
@@ -351,7 +336,7 @@
                 <div class="toggle-track on" id="sz-toggle" onclick="toggleSafeZones()" role="switch" aria-checked="true" aria-label="Toggle safe zones" tabindex="0" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();toggleSafeZones();}">
                     <div class="toggle-knob"></div>
                 </div>
-                <span class="text-[11px] text-white/40">Safe Zones</span>
+                <span class="text-[11px] text-text-dim">Safe Zones</span>
             </div>
         </div>
 
@@ -363,14 +348,14 @@
     <!-- ==================== GDN SECTION ==================== -->
     <div id="gdn-section" class="max-w-[1400px] mx-auto px-6 py-7 hidden">
 
-        <div class="upload-box glass border-dashed !border-[rgba(255,255,255,0.15)] p-6 text-center cursor-pointer transition-all mb-7"
+        <div class="upload-box glass border-dashed !border-[rgba(0,0,0,0.12)] p-6 text-center cursor-pointer transition-all mb-7"
              onclick="document.getElementById('gdn-input').click()"
              ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleGDNDrop(event)">
             <div class="mb-2">
-                <svg class="mx-auto text-white/40" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                <svg class="mx-auto text-text-dim" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
             </div>
-            <div class="text-sm font-medium text-white mb-0.5">העלאת באנרים GDN</div>
-            <div class="text-xs text-white/40 mb-4">הגדלים מזוהים אוטומטית לפי רזולוציה או שם הקובץ</div>
+            <div class="text-sm font-medium text-text-primary mb-0.5">העלאת באנרים GDN</div>
+            <div class="text-xs text-text-dim mb-4">הגדלים מזוהים אוטומטית לפי רזולוציה או שם הקובץ</div>
             <input type="file" id="gdn-input" accept="image/*" multiple class="hidden" onchange="handleGDNUpload(event)">
             <div id="gdn-badges" class="flex flex-wrap gap-1.5 justify-center"></div>
         </div>
@@ -378,8 +363,8 @@
         <!-- Website Mockups Section (on top) -->
         <div id="site-mockups-section" class="mb-8 hidden">
             <div class="flex items-center justify-between mb-4">
-                <h2 class="text-sm font-semibold text-white">תצוגה באתרים</h2>
-                <span class="text-xs text-white/40">איך המודעות נראות באתרי המפרסמים</span>
+                <h2 class="text-sm font-semibold text-text-primary">תצוגה באתרים</h2>
+                <span class="text-xs text-text-dim">איך המודעות נראות באתרי המפרסמים</span>
             </div>
             <div id="site-mockups-grid" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4"></div>
         </div>
@@ -387,7 +372,7 @@
         <!-- Size Grid -->
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
-                <h2 class="text-sm font-semibold text-white">גדלים שהועלו</h2>
+                <h2 class="text-sm font-semibold text-text-primary">גדלים שהועלו</h2>
                 <div id="gdn-filter" class="flex gap-1 flex-wrap">
                     <button class="filter-btn" data-filter="all" onclick="filterGDN('all')">הכל</button>
                     <button class="filter-btn" data-filter="rectangle" onclick="filterGDN('rectangle')">Rectangle</button>
@@ -405,11 +390,11 @@
     <!-- Export Overlay -->
     <div id="export-overlay" class="export-overlay">
         <div class="glass p-6 max-w-md w-full mx-4 text-center">
-            <h3 class="text-sm font-semibold mb-4 text-white">ייצוא PDF</h3>
-            <p id="export-status" class="text-white/60 text-sm mb-4">מכין PDF...</p>
+            <h3 class="text-sm font-semibold mb-4 text-text-primary">ייצוא PDF</h3>
+            <p id="export-status" class="text-text-mid text-sm mb-4">מכין PDF...</p>
             <div class="flex gap-3 justify-center">
                 <a id="export-download" download="ad-preview.pdf" class="px-5 py-2 bg-accent text-white rounded-full text-sm font-medium hover:bg-blue-600 transition-colors cursor-pointer hidden">הורד PDF</a>
-                <button onclick="closeExport()" class="px-5 py-2 border border-white/20 text-white/60 rounded-full text-sm hover:bg-white/10 transition-colors">סגור</button>
+                <button onclick="closeExport()" class="px-5 py-2 border border-border text-text-mid rounded-full text-sm hover:bg-black/5 transition-colors">סגור</button>
             </div>
         </div>
     </div>
@@ -508,7 +493,7 @@ function switchTab(tab) {
         if (isActive) {
             b.className = `tab-btn px-5 py-1.5 text-sm font-medium rounded-${side}-full bg-accent text-white`;
         } else {
-            b.className = `tab-btn px-5 py-1.5 text-sm font-medium rounded-${side}-full bg-white/5 text-white/50 border border-white/10 hover:bg-white/10 hover:text-white/80`;
+            b.className = `tab-btn px-5 py-1.5 text-sm font-medium rounded-${side}-full bg-black/5 text-text-mid border border-border hover:bg-black/10 hover:text-text-primary`;
         }
     });
     document.getElementById('facebook-section').classList.toggle('hidden', tab !== 'facebook');
@@ -792,7 +777,7 @@ function renderPlacements() {
 
         const section = document.createElement('div');
         section.className = 'mb-4';
-        section.innerHTML = `<div class="text-base font-bold text-white/90 mb-2">${row.label}</div>`;
+        section.innerHTML = `<div class="text-base font-bold text-text-primary mb-2">${row.label}</div>`;
 
         const rowWrap = document.createElement('div');
         rowWrap.className = 'placement-row-wrap';
@@ -815,7 +800,7 @@ function renderPlacements() {
             card.innerHTML = `
                 <div class="flex items-center gap-1.5 px-2.5 py-1.5 border-b border-white/5" style="border-radius:16px 16px 0 0;overflow:hidden;">
                     ${getPlatformBadge(p.platform)}
-                    <span class="text-[10px] font-semibold text-white/80">${p.name}</span>
+                    <span class="text-[10px] font-semibold text-text-primary/80">${p.name}</span>
                 </div>
                 <div class="flex justify-center items-center p-2" id="body-${p.id}"></div>
             `;
@@ -861,7 +846,7 @@ function updateAllPreviews() {
 
         if (!hasMediaForPlacement(p)) {
             const label = p.ratio === 'carousel' ? 'העלה קרוסלה' : p.ratio === 'carouselSq' ? 'העלה תמונות פיד' : p.ratio === 'feed45' ? 'העלה תמונה 4:5' : 'העלה מדיה';
-            body.innerHTML = `<span class="text-white/30 text-xs">${label}</span>`;
+            body.innerHTML = `<span class="text-text-dim text-xs">${label}</span>`;
             return;
         }
         let el;
@@ -1243,7 +1228,7 @@ function buildFeedCarouselMockup(p) {
 function renderGDNBadges() {
     document.getElementById('gdn-badges').innerHTML = gdnSizes.map(s => {
         const matched = state.gdnImages[`${s.w}x${s.h}`];
-        return `<span class="text-[10px] px-2 py-0.5 rounded ${matched ? 'bg-fn-green-bg text-fn-green' : 'bg-white/5 text-white/40'}">${s.w}x${s.h}</span>`;
+        return `<span class="text-[10px] px-2 py-0.5 rounded ${matched ? 'bg-fn-green-bg text-fn-green' : 'bg-white/5 text-text-dim'}">${s.w}x${s.h}</span>`;
     }).join('');
 }
 
@@ -1264,12 +1249,12 @@ function renderGDNGrid() {
         card.dataset.cat = s.cat;
         card.innerHTML = `
             <div class="flex items-center gap-2 mb-2">
-                <span class="text-[12px] font-medium text-white">${s.name}</span>
-                <span class="text-[10px] text-white/40">${s.w}x${s.h}</span>
+                <span class="text-[12px] font-medium text-text-primary">${s.name}</span>
+                <span class="text-[10px] text-text-dim">${s.w}x${s.h}</span>
                 <span class="w-2 h-2 rounded-full ${hasImg ? 'bg-fn-green' : 'bg-white/15'}"></span>
             </div>
             <div class="gdn-preview-container" style="width:${pw}px;height:${ph}px;">
-                ${hasImg ? '' : '<span class="absolute inset-0 flex items-center justify-center text-white/30 text-[9px]">אין תמונה</span>'}
+                ${hasImg ? '' : '<span class="absolute inset-0 flex items-center justify-center text-text-dim text-[9px]">אין תמונה</span>'}
             </div>
         `;
         if (hasImg) {
@@ -1324,7 +1309,7 @@ function filterGDN(cat) {
         if (isActive) {
             b.className = 'filter-btn px-3 py-1.5 text-[13px] rounded-full bg-accent text-white font-medium';
         } else {
-            b.className = 'filter-btn px-3 py-1.5 text-[13px] rounded-full bg-white/5 border border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80 font-medium';
+            b.className = 'filter-btn px-3 py-1.5 text-[13px] rounded-full bg-black/5 border border-border text-text-mid hover:bg-black/10 hover:text-text-primary font-medium';
         }
     });
     document.querySelectorAll('#gdn-grid > div').forEach(card => {
@@ -1551,9 +1536,9 @@ function renderSiteMockups() {
         card.className = 'glass overflow-hidden hover:border-white/20 transition-colors';
 
         card.innerHTML = `
-            <div class="flex items-center gap-2 px-3 py-2 border-b border-white/5 text-[12px] font-medium text-white/60">
-                <span class="font-semibold text-white">${site.name}</span>
-                <span class="text-white/40 text-[10px]">${site.url}</span>
+            <div class="flex items-center gap-2 px-3 py-2 border-b border-white/5 text-[12px] font-medium text-text-mid">
+                <span class="font-semibold text-text-primary">${site.name}</span>
+                <span class="text-text-dim text-[10px]">${site.url}</span>
             </div>
             <div style="background:${site.bgColor};overflow:hidden;">
                 <!-- Header -->

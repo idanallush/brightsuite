@@ -23,12 +23,13 @@ export default function AdCheckerPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-80px)] -m-6">
+    <div className="h-[calc(100vh-80px)] -mx-4 md:-mx-6 -mb-4 md:-mb-6">
       <iframe
         src="/tools/ad-checker/index.html"
-        className="w-full h-full border-0"
+        className="w-full h-full border-0 rounded-t-xl"
         title="Ad Safe Zone Checker"
         sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"
+        style={{ background: '#f4f2ee' }}
       />
     </div>
   );
