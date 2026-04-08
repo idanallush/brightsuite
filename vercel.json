@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/ads/pdf/**/route.ts": {
+      "maxDuration": 60,
+      "memory": 1536
+    },
+    "src/app/api/writer/generate/route.ts": {
+      "maxDuration": 90
+    },
+    "src/app/api/writer/generate/regenerate/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/writer/generate/regenerate-batch/route.ts": {
+      "maxDuration": 90
+    },
+    "src/app/api/writer/fetch-url/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/cpa/dashboard/cards/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/cpa/cron/refresh/route.ts": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cpa/cron/refresh",
+      "schedule": "0 8 * * *"
+    }
+  ]
+}

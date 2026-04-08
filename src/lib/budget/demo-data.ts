@@ -1,0 +1,278 @@
+import type { Client, Campaign, BudgetPeriod, ChangelogEntry } from '@/lib/budget/types'
+
+/**
+ * Demo data for development without Supabase connection.
+ * Remove once connected to real database.
+ */
+
+export const demoClients: Client[] = [
+  {
+    id: '1',
+    name: 'מסעדת השף',
+    slug: 'misadat-hashef',
+    share_token: 'abc123def456',
+    is_active: true,
+    created_at: '2026-01-15T10:00:00Z',
+    notes: 'לקוח פרימיום, תקציב חודשי ₪45,000',
+    meta_ad_account_id: null,
+    google_customer_id: null,
+    google_mcc_id: null,
+  },
+  {
+    id: '2',
+    name: 'פיטנס פלוס',
+    slug: 'fitness-plus',
+    share_token: 'xyz789ghi012',
+    is_active: true,
+    created_at: '2026-02-01T10:00:00Z',
+    notes: null,
+    meta_ad_account_id: null,
+    google_customer_id: null,
+    google_mcc_id: null,
+  },
+  {
+    id: '3',
+    name: 'דנטל קליניק',
+    slug: 'dental-clinic',
+    share_token: 'jkl345mno678',
+    is_active: true,
+    created_at: '2026-02-20T10:00:00Z',
+    notes: 'מתמקדים בקמפיין שתלים',
+    meta_ad_account_id: null,
+    google_customer_id: null,
+    google_mcc_id: null,
+  },
+]
+
+export const demoCampaigns: Campaign[] = [
+  // Client 1 - מסעדת השף
+  {
+    id: 'c1',
+    client_id: '1',
+    name: 'קמפיין המרות - מבצע חורף',
+    technical_name: 'Bright | Conv | Winter Sale | 01.01.26',
+    platform: 'facebook',
+    campaign_type: 'Sales',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-01-01',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-01-01T10:00:00Z',
+  },
+  {
+    id: 'c2',
+    client_id: '1',
+    name: 'קמפיין רימרקטינג',
+    technical_name: 'Bright | Conv | Remarketing | 15.01.26',
+    platform: 'facebook',
+    campaign_type: 'Remarketing',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-01-15',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-01-15T10:00:00Z',
+  },
+  {
+    id: 'c3',
+    client_id: '1',
+    name: 'חיפוש - מסעדה תל אביב',
+    technical_name: 'Bright | Search | Restaurant TLV | 01.02.26',
+    platform: 'google',
+    campaign_type: 'Search',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-02-01',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'c4',
+    client_id: '1',
+    name: 'PMax - הזמנות',
+    technical_name: 'Bright | PMax | Orders | 01.03.26',
+    platform: 'google',
+    campaign_type: 'PMax',
+    ad_link: null,
+    status: 'paused',
+    start_date: '2026-03-01',
+    end_date: null,
+    notes: 'מושהה עד לעדכון אתר',
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-03-01T10:00:00Z',
+  },
+
+  // Client 2 - פיטנס פלוס
+  {
+    id: 'c5',
+    client_id: '2',
+    name: 'קמפיין לידים - מנוי חדש',
+    technical_name: 'Bright | Leads | New Member | 01.02.26',
+    platform: 'facebook',
+    campaign_type: 'Leads',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-02-01',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-02-01T10:00:00Z',
+  },
+  {
+    id: 'c6',
+    client_id: '2',
+    name: 'חיפוש - חדר כושר',
+    technical_name: 'Bright | Search | Gym | 01.03.26',
+    platform: 'google',
+    campaign_type: 'Search',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-03-01',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-03-01T10:00:00Z',
+  },
+
+  // Client 3 - דנטל קליניק
+  {
+    id: 'c7',
+    client_id: '3',
+    name: 'קמפיין שתלים',
+    technical_name: 'Bright | Conv | Implants | 20.02.26',
+    platform: 'facebook',
+    campaign_type: 'Sales',
+    ad_link: null,
+    status: 'active',
+    start_date: '2026-02-20',
+    end_date: null,
+    notes: null,
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-02-20T10:00:00Z',
+  },
+  {
+    id: 'c8',
+    client_id: '3',
+    name: 'GDN - מודעות רשת',
+    technical_name: 'Bright | GDN | Display | 01.03.26',
+    platform: 'google',
+    campaign_type: 'GDN',
+    ad_link: null,
+    status: 'stopped',
+    start_date: '2026-03-01',
+    end_date: '2026-03-20',
+    notes: 'הופסק - ביצועים נמוכים',
+    meta_campaign_id: null,
+    actual_spend: 0,
+    actual_spend_month: null,
+    last_synced_at: null,
+    created_at: '2026-03-01T10:00:00Z',
+  },
+]
+
+export const demoBudgetPeriods: BudgetPeriod[] = [
+  // c1 - budget changed mid-March
+  { id: 'bp1', campaign_id: 'c1', daily_budget: 200, start_date: '2026-01-01', end_date: '2026-03-14', created_by: null, created_at: '2026-01-01T10:00:00Z' },
+  { id: 'bp2', campaign_id: 'c1', daily_budget: 300, start_date: '2026-03-15', end_date: null, created_by: null, created_at: '2026-03-15T10:00:00Z' },
+
+  // c2
+  { id: 'bp3', campaign_id: 'c2', daily_budget: 150, start_date: '2026-01-15', end_date: null, created_by: null, created_at: '2026-01-15T10:00:00Z' },
+
+  // c3
+  { id: 'bp4', campaign_id: 'c3', daily_budget: 250, start_date: '2026-02-01', end_date: null, created_by: null, created_at: '2026-02-01T10:00:00Z' },
+
+  // c4
+  { id: 'bp5', campaign_id: 'c4', daily_budget: 400, start_date: '2026-03-01', end_date: null, created_by: null, created_at: '2026-03-01T10:00:00Z' },
+
+  // c5 - budget changed
+  { id: 'bp6', campaign_id: 'c5', daily_budget: 100, start_date: '2026-02-01', end_date: '2026-03-09', created_by: null, created_at: '2026-02-01T10:00:00Z' },
+  { id: 'bp7', campaign_id: 'c5', daily_budget: 180, start_date: '2026-03-10', end_date: null, created_by: null, created_at: '2026-03-10T10:00:00Z' },
+
+  // c6
+  { id: 'bp8', campaign_id: 'c6', daily_budget: 200, start_date: '2026-03-01', end_date: null, created_by: null, created_at: '2026-03-01T10:00:00Z' },
+
+  // c7
+  { id: 'bp9', campaign_id: 'c7', daily_budget: 350, start_date: '2026-02-20', end_date: null, created_by: null, created_at: '2026-02-20T10:00:00Z' },
+
+  // c8 - stopped
+  { id: 'bp10', campaign_id: 'c8', daily_budget: 120, start_date: '2026-03-01', end_date: '2026-03-20', created_by: null, created_at: '2026-03-01T10:00:00Z' },
+]
+
+export const demoChangelog: ChangelogEntry[] = [
+  {
+    id: 'cl1',
+    campaign_id: 'c1',
+    action: 'campaign_added',
+    description: 'קמפיין חדש נוסף: קמפיין המרות - מבצע חורף',
+    old_value: null,
+    new_value: null,
+    performed_by: 'עידן',
+    performed_at: '2026-01-01T10:00:00Z',
+  },
+  {
+    id: 'cl2',
+    campaign_id: 'c1',
+    action: 'budget_change',
+    description: 'תקציב שונה מ-₪200 ל-₪300, החל מ-15.03.26',
+    old_value: '200',
+    new_value: '300',
+    performed_by: 'עידן',
+    performed_at: '2026-03-15T10:00:00Z',
+  },
+  {
+    id: 'cl3',
+    campaign_id: 'c4',
+    action: 'status_change',
+    description: 'סטטוס שונה מפעיל למושהה',
+    old_value: 'active',
+    new_value: 'paused',
+    performed_by: 'דני',
+    performed_at: '2026-03-10T14:00:00Z',
+  },
+  {
+    id: 'cl4',
+    campaign_id: 'c5',
+    action: 'budget_change',
+    description: 'תקציב שונה מ-₪100 ל-₪180, החל מ-10.03.26',
+    old_value: '100',
+    new_value: '180',
+    performed_by: 'עידן',
+    performed_at: '2026-03-10T09:00:00Z',
+  },
+  {
+    id: 'cl5',
+    campaign_id: 'c8',
+    action: 'status_change',
+    description: 'סטטוס שונה מפעיל להופסק',
+    old_value: 'active',
+    new_value: 'stopped',
+    performed_by: 'דני',
+    performed_at: '2026-03-20T16:00:00Z',
+  },
+]
