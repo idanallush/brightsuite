@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "@/lib/auth/session";
+import { requireApiAuth } from "@/lib/auth/require-auth-api";
 import { generateClientPdf } from "@/lib/ads/pdf/generator";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { error } = await requireApiAuth();
+  if (error) return error;
 
   try {
     const body = await request.json();

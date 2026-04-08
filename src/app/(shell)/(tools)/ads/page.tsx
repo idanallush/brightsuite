@@ -7,14 +7,14 @@ import { BarChart3, LayoutGrid, SlidersHorizontal, Download } from 'lucide-react
 import { LoginButton } from '@/components/ads/auth/login-button';
 
 export default function AdsPage() {
-  const { user, tools, loading } = useAuth();
+  const { user, loading, hasToolAccess } = useAuth();
   const router = useRouter();
 
-  const hasAccess = !loading && tools.includes('ads');
+  const hasAccess = !loading && hasToolAccess('ads');
 
   useEffect(() => {
     if (!loading && !hasAccess) {
-      router.replace('/');
+      router.replace('/dashboard');
     }
   }, [loading, hasAccess, router]);
 

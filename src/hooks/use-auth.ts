@@ -6,12 +6,12 @@ import type { ToolSlug } from '@/types/auth';
 
 interface SessionResponse {
   authenticated: boolean;
-  user?: { id: number; email: string; name: string; role: string };
+  user?: { id: number; email: string; name: string; role: string; avatarUrl?: string };
   tools?: ToolSlug[];
 }
 
 interface AuthState {
-  user: { id: number; email: string; name: string; role: string } | null;
+  user: { id: number; email: string; name: string; role: string; avatarUrl?: string } | null;
   tools: ToolSlug[];
   loading: boolean;
 }

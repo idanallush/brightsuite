@@ -8,6 +8,7 @@ export interface User {
   name: string;
   role: UserRole;
   avatarUrl: string | null;
+  googleId?: string | null;
   isActive: boolean;
   createdAt: string;
 }
@@ -18,6 +19,7 @@ export interface SessionData {
   name: string;
   role: UserRole;
   tools: ToolSlug[];
+  avatarUrl?: string;
   fbAccessToken?: string;
   fbTokenExpiry?: number;
   fbUserId?: string;

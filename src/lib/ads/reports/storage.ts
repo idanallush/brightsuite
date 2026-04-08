@@ -12,6 +12,7 @@ export interface ReportMeta {
   createdAt: string;
   reportType: string;
   blobUrl?: string;
+  createdByUserId?: number;
 }
 
 const REPORTS_KEY = "ads-reports-index";
@@ -32,11 +33,16 @@ export async function saveReport(meta: ReportMeta, pdfBuffer: Buffer): Promise<v
   }
 }
 
-export async function listReports(): Promise<ReportMeta[]> {
+export async function listReports(userId?: number): Promise<ReportMeta[]> {
   try {
     const res = await fetch(`${process.env.BLOB_READ_WRITE_TOKEN ? "https://blob.vercel-storage.com" : ""}/${REPORTS_KEY}.json`);
     if (!res.ok) return [];
-    return await res.json();
+    const reports: ReportMeta[] = await res.json();
+    // If userId is provided, filter to user's reports (+ legacy reports without createdByUserId)
+    if (userId !== undefined) {
+      return reports.filter((r) => !r.createdByUserId || r.createdByUserId === userId);
+    }
+    return reports;
   } catch {
     return [];
   }

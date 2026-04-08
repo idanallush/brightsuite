@@ -1,30 +1,51 @@
 'use client';
 
+import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, Menu } from 'lucide-react';
 import { TOOLS } from '@/lib/tools';
+import { useSidebarStore } from '@/stores/sidebar';
 
-const pageTitles: Record<string, string> = {
-  '/dashboard': 'דשבורד',
-  '/settings': 'הגדרות',
-  ...Object.fromEntries(TOOLS.map((t) => [t.href, t.name])),
+const labelMap: Record<string, string> = {
+  dashboard: 'דשבורד',
+  ads: 'מודעות פייסבוק',
+  budget: 'BudgetFlow',
+  cpa: 'CPA Tracker',
+  writer: 'MultiWrite',
+  'ad-checker': 'בדיקת מודעות',
+  settings: 'הגדרות',
+  team: 'ניהול צוות',
+  audit: 'יומן פעולות',
+  reports: 'דוחות',
+  campaigns: 'קמפיינים',
+  clients: 'לקוחות',
+  history: 'היסטוריה',
+  archive: 'ארכיון',
+  alerts: 'התראות',
+  output: 'תוצאות',
 };
+
+function getSegmentLabel(segment: string): string {
+  return labelMap[segment] || segment;
+}
 
 export const Topbar = () => {
   const pathname = usePathname();
+  const toggle = useSidebarStore((s) => s.toggle);
 
-  const currentTitle =
-    pageTitles[pathname] ||
-    Object.entries(pageTitles).find(([path]) =>
-      pathname.startsWith(path)
-    )?.[1] ||
-    '';
+  // Build breadcrumb segments
+  const segments = pathname.split('/').filter(Boolean);
+  // e.g. /ads/dashboard → ['ads', 'dashboard']
 
-  const isDashboard = pathname === '/dashboard';
+  const breadcrumbs = segments.map((seg, i) => ({
+    label: getSegmentLabel(seg),
+    href: '/' + segments.slice(0, i + 1).join('/'),
+    isLast: i === segments.length - 1,
+  }));
 
   return (
     <div
-      className="px-6 py-3 flex items-center gap-2"
+      className="px-4 md:px-6 py-3 flex items-center gap-2"
       style={{
         background: 'var(--glass-bg)',
         backdropFilter: 'blur(16px)',
@@ -32,27 +53,53 @@ export const Topbar = () => {
         borderBottom: '1px solid var(--glass-border)',
       }}
     >
-      <span
-        className="text-sm"
-        style={{ color: 'var(--text-tertiary)' }}
+      {/* Hamburger — mobile only */}
+      <button
+        onClick={toggle}
+        className="btn-icon md:hidden shrink-0"
+        title="תפריט"
       >
-        דשבורד
-      </span>
+        <Menu size={20} />
+      </button>
 
-      {!isDashboard && (
-        <>
-          <ChevronLeft
-            size={14}
-            style={{ color: 'var(--text-tertiary)' }}
-          />
-          <span
-            className="text-sm font-medium"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {currentTitle}
-          </span>
-        </>
-      )}
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+        <Link
+          href="/dashboard"
+          className="text-sm shrink-0 hover:underline"
+          style={{ color: 'var(--text-tertiary)' }}
+        >
+          דשבורד
+        </Link>
+
+        {breadcrumbs
+          .filter((b) => b.href !== '/dashboard')
+          .map((crumb) => (
+            <span key={crumb.href} className="flex items-center gap-1.5 min-w-0">
+              <ChevronLeft
+                size={14}
+                className="shrink-0"
+                style={{ color: 'var(--text-tertiary)' }}
+              />
+              {crumb.isLast ? (
+                <span
+                  className="text-sm font-medium truncate"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  {crumb.label}
+                </span>
+              ) : (
+                <Link
+                  href={crumb.href}
+                  className="text-sm truncate hover:underline"
+                  style={{ color: 'var(--text-tertiary)' }}
+                >
+                  {crumb.label}
+                </Link>
+              )}
+            </span>
+          ))}
+      </div>
     </div>
   );
 };

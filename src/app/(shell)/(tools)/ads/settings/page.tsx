@@ -178,7 +178,7 @@ function AccountCard({
 }
 
 export default function SettingsPage() {
-  const { tools, loading: authLoading } = useAuth();
+  const { hasToolAccess, loading: authLoading } = useAuth();
 
   const {
     data: status,
@@ -264,7 +264,7 @@ export default function SettingsPage() {
   }, []);
 
   // Permission check AFTER all hooks
-  if (!authLoading && !tools.includes('ads')) {
+  if (!authLoading && !hasToolAccess('ads')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <h2 className="text-base font-medium text-zinc-700 mb-1">אין גישה לכלי זה</h2>
@@ -349,6 +349,15 @@ export default function SettingsPage() {
                         {format(new Date(status.tokenExpiry), "MMM d, yyyy HH:mm")}
                       </p>
                     )}
+                    {isTokenExpiringSoon && !isTokenExpired && (
+                      <Badge variant="destructive" className="text-[10px] mt-1">
+                        <AlertTriangle className="h-3 w-3 me-1" aria-hidden="true" />
+                        פג תוקף בקרוב
+                      </Badge>
+                    )}
+                    {isTokenExpired && (
+                      <Badge variant="destructive" className="text-[10px] mt-1">פג תוקף</Badge>
+                    )}
                   </div>
                 </div>
 
@@ -377,6 +386,16 @@ export default function SettingsPage() {
                     <RefreshCcw className="h-4 w-4" aria-hidden="true" />
                   )}
                   {isTokenExpired ? "התחבר מחדש" : "רענון טוקן"}
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => window.open("https://business.facebook.com/settings/", "_blank")}
+                  aria-label="פתח הגדרות עסקיות בפייסבוק (נפתח בלשונית חדשה)"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                  הגדרות עסקיות פייסבוק
                 </Button>
                 <Button
                   variant="ghost"
@@ -410,6 +429,144 @@ export default function SettingsPage() {
                 התחבר עם פייסבוק
               </Button>
             </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 2A: החשבונות שלי (Selected / Visible) */}
+      <Card className="border-[#E3F2FD]" style={{ backgroundColor: "#FFFFFF" }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Star className="h-5 w-5 text-[#1877F2]" aria-hidden="true" />
+            החשבונות שלי
+            <Badge variant="outline" className="mr-auto text-[11px] font-normal border-[#BBDEFB] text-[#1877F2]">
+              {selectedAccounts.length}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            חשבונות שמוצגים בתפריט הבחירה בדשבורד.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {accountsLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              טוען חשבונות...
+            </div>
+          ) : selectedAccounts.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <Star className="h-8 w-8 mx-auto mb-2 opacity-30" aria-hidden="true" />
+              <p className="text-sm font-medium">אין חשבונות נבחרים</p>
+              <p className="text-xs mt-1">
+                הוסף חשבונות מהרשימה למטה כדי שיופיעו בתפריט הדשבורד.
+              </p>
+            </div>
+          ) : (
+            selectedAccounts.map((account) => (
+              <AccountCard
+                key={account.id}
+                account={account}
+                variant="selected"
+                onAction={removeFromSelected}
+              />
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Section 2B: כל החשבונות (Available / Hidden) */}
+      <Card className="border-[#E5E7EB]" style={{ backgroundColor: "#F9FAFB" }}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Archive className="h-5 w-5 text-zinc-500" aria-hidden="true" />
+            כל החשבונות
+            <Badge variant="outline" className="mr-auto text-[11px] font-normal border-zinc-300 text-zinc-500">
+              {availableAccounts.length}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            חשבונות שמוסתרים מהתפריט. לחץ + כדי להוסיף אותם לרשימה.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {accountsLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-4">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              טוען חשבונות...
+            </div>
+          ) : availableAccounts.length === 0 ? (
+            <div className="text-center py-6 text-muted-foreground">
+              <CheckCircle className="h-8 w-8 mx-auto mb-2 opacity-30 text-green-500" aria-hidden="true" />
+              <p className="text-sm font-medium">כל החשבונות נבחרו</p>
+              <p className="text-xs mt-1">
+                כל החשבונות מוצגים בתפריט הדשבורד.
+              </p>
+            </div>
+          ) : (
+            <>
+              {availableAccounts.length > 3 && (
+                <div className="relative">
+                  <Search
+                    className="absolute start-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-400"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    type="search"
+                    placeholder="חיפוש חשבונות..."
+                    value={availableSearch}
+                    onChange={(e) => setAvailableSearch(e.target.value)}
+                    className="ps-8 h-9 text-sm bg-white"
+                    aria-label="חיפוש חשבונות זמינים לפי שם או מזהה"
+                  />
+                </div>
+              )}
+
+              <div className="relative">
+                <div className="space-y-2">
+                  {filteredAvailable.length === 0 ? (
+                    <p className="text-sm text-zinc-400 text-center py-4">
+                      לא נמצאו חשבונות תואמים.
+                    </p>
+                  ) : (
+                    displayedAvailable.map((account) => (
+                      <AccountCard
+                        key={account.id}
+                        account={account}
+                        variant="available"
+                        onAction={addToSelected}
+                      />
+                    ))
+                  )}
+                </div>
+
+                {!showAllAvailable && hasMoreAvailable && (
+                  <div
+                    className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(to bottom, transparent, #F9FAFB)",
+                    }}
+                  />
+                )}
+              </div>
+
+              {hasMoreAvailable && (
+                <div className="text-center pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllAvailable((prev) => !prev)}
+                    className="text-sm font-medium hover:underline flex items-center gap-1 mx-auto"
+                    style={{ color: "#1877F2" }}
+                  >
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform ${showAllAvailable ? "rotate-180" : ""}`}
+                    />
+                    {showAllAvailable
+                      ? "הצג פחות"
+                      : `הצג את כל ${filteredAvailable.length} החשבונות`}
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -479,6 +636,36 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Section: Permissions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Shield className="h-5 w-5" aria-hidden="true" />
+            הרשאות נדרשות
+          </CardTitle>
+          <CardDescription>
+            הרשאות Facebook API הנדרשות לפעולת הכלי.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-2">
+            {[
+              { perm: "ads_read", desc: "קריאת נתוני חשבון מודעות, קריאייטיבים ומטריקות ביצועים" },
+              { perm: "business_management", desc: "גישה לחשבונות עסקיים ורשימות חשבונות מודעות" },
+            ].map(({ perm, desc }) => (
+              <div key={perm} className="flex items-center gap-3 p-2.5 rounded border">
+                <CheckCircle className="h-4 w-4 text-green-600 shrink-0" aria-hidden="true" />
+                <div>
+                  <p className="text-sm font-medium font-mono">{perm}</p>
+                  <p className="text-xs text-muted-foreground">{desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Section: About */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
@@ -492,6 +679,16 @@ export default function SettingsPage() {
             לצפייה, סינון וייצוא דוחות קריאייטיב של מודעות פייסבוק.
           </p>
           <p>גרסה 1.0.0</p>
+          <a
+            href="https://developers.facebook.com/status/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-blue-600 hover:underline w-fit"
+            aria-label="בדוק סטטוס Facebook API (נפתח בלשונית חדשה)"
+          >
+            <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+            סטטוס Facebook API
+          </a>
         </CardContent>
       </Card>
     </div>

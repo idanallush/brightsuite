@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import Anthropic from '@anthropic-ai/sdk';
+import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -27,6 +28,9 @@ If a field has no data, use an empty string or empty array. Return ONLY valid JS
 
 // POST /api/writer/fetch-url — extract text content from a URL + AI analysis
 export async function POST(request: NextRequest) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const { url } = await request.json();
   if (!url) return NextResponse.json({ error: 'url is required' }, { status: 400 });
 

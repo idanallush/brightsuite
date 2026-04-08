@@ -10,10 +10,14 @@ import {
   Target,
   Image,
   PenLine,
+  X,
+  ChevronsRight,
+  ChevronsLeft,
   type LucideIcon,
 } from 'lucide-react';
 import { TOOLS } from '@/lib/tools';
 import { useAuth } from '@/hooks/use-auth';
+import { useSidebarStore } from '@/stores/sidebar';
 
 const iconMap: Record<string, LucideIcon> = {
   Shield,
@@ -23,40 +27,56 @@ const iconMap: Record<string, LucideIcon> = {
   PenLine,
 };
 
-export const Sidebar = () => {
+const SidebarContent = ({
+  collapsed = false,
+  onNavClick,
+}: {
+  collapsed?: boolean;
+  onNavClick?: () => void;
+}) => {
   const pathname = usePathname();
   const { user, logout, hasToolAccess } = useAuth();
 
   const accessibleTools = TOOLS.filter((tool) => hasToolAccess(tool.slug));
-
   const firstLetter = user?.name?.charAt(0) || '?';
 
   return (
-    <aside className="glass-panel w-64 shrink-0 flex flex-col h-full overflow-hidden">
+    <>
       {/* Logo */}
-      <div className="p-5 pb-4">
-        <h1
-          className="text-lg font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          BrightSuite
-        </h1>
-        <p
-          className="text-xs mt-0.5"
-          style={{ color: 'var(--text-tertiary)' }}
-        >
-          כלים לסוכנות
-        </p>
+      <div className={`p-5 pb-4 overflow-hidden ${collapsed ? 'flex justify-center px-2' : ''}`}>
+        {collapsed ? (
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white"
+            style={{ background: 'var(--accent)' }}
+          >
+            B
+          </div>
+        ) : (
+          <>
+            <h1
+              className="text-lg font-semibold whitespace-nowrap"
+              style={{ color: 'var(--accent)' }}
+            >
+              BrightSuite
+            </h1>
+            <p
+              className="text-xs mt-0.5 whitespace-nowrap"
+              style={{ color: 'var(--text-tertiary)' }}
+            >
+              כלים לסוכנות
+            </p>
+          </>
+        )}
       </div>
 
       {/* Divider */}
       <div
-        className="mx-4"
+        className="mx-3"
         style={{ borderBottom: '1px solid var(--glass-border)', opacity: 0.5 }}
       />
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 flex flex-col gap-0.5 overflow-y-auto">
+      <nav className="flex-1 p-2 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {accessibleTools.map((tool) => {
           const Icon = iconMap[tool.icon] || Shield;
           const isActive = pathname.startsWith(tool.href);
@@ -65,7 +85,11 @@ export const Sidebar = () => {
             <Link
               key={tool.slug}
               href={tool.href}
-              className="flex items-center gap-3 py-2 px-3 rounded-xl transition-colors"
+              onClick={onNavClick}
+              title={collapsed ? tool.name : undefined}
+              className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-200 ${
+                collapsed ? 'justify-center px-2' : 'px-3'
+              }`}
               style={{
                 background: isActive ? 'var(--accent-subtle)' : undefined,
                 color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
@@ -74,8 +98,10 @@ export const Sidebar = () => {
                   : '3px solid transparent',
               }}
             >
-              <Icon size={18} />
-              <span className="text-sm font-medium">{tool.name}</span>
+              <Icon size={18} className="shrink-0" />
+              {!collapsed && (
+                <span className="text-sm font-medium whitespace-nowrap">{tool.name}</span>
+              )}
             </Link>
           );
         })}
@@ -83,60 +109,145 @@ export const Sidebar = () => {
 
       {/* Divider */}
       <div
-        className="mx-4"
+        className="mx-3"
         style={{ borderBottom: '1px solid var(--glass-border)', opacity: 0.5 }}
       />
 
       {/* Bottom section */}
-      <div className="p-3 flex flex-col gap-1">
+      <div className="p-2 flex flex-col gap-1">
         <Link
           href="/settings"
-          className="flex items-center gap-3 py-2 px-3 rounded-xl transition-colors"
+          onClick={onNavClick}
+          title={collapsed ? 'הגדרות' : undefined}
+          className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-200 ${
+            collapsed ? 'justify-center px-2' : 'px-3'
+          }`}
           style={{
-            background: pathname === '/settings' ? 'var(--accent-subtle)' : undefined,
-            color: pathname === '/settings' ? 'var(--accent)' : 'var(--text-secondary)',
+            background: pathname.startsWith('/settings') ? 'var(--accent-subtle)' : undefined,
+            color: pathname.startsWith('/settings') ? 'var(--accent)' : 'var(--text-secondary)',
           }}
         >
-          <Settings size={18} />
-          <span className="text-sm font-medium">הגדרות</span>
+          <Settings size={18} className="shrink-0" />
+          {!collapsed && <span className="text-sm font-medium whitespace-nowrap">הגדרות</span>}
         </Link>
 
         {user && (
-          <div className="flex items-center gap-3 py-2 px-3">
+          <div className={`flex items-center gap-3 py-2 ${collapsed ? 'justify-center px-1' : 'px-3'}`}>
             {/* Avatar */}
-            <div
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
-              style={{ background: 'var(--accent)' }}
-            >
-              {firstLetter}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p
-                className="text-sm font-medium truncate"
-                style={{ color: 'var(--text-primary)' }}
+            {user.avatarUrl ? (
+              <img
+                src={user.avatarUrl}
+                alt={user.name}
+                referrerPolicy="no-referrer"
+                className="w-8 h-8 rounded-full shrink-0 object-cover"
+              />
+            ) : (
+              <div
+                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold text-white shrink-0"
+                style={{ background: 'var(--accent)' }}
               >
-                {user.name}
-              </p>
-              <span
-                className="text-xs px-1.5 py-0.5 rounded"
-                style={{
-                  color: 'var(--accent)',
-                  background: 'var(--accent-subtle)',
-                }}
-              >
-                {user.role === 'admin' ? 'אדמין' : 'משתמש'}
-              </span>
-            </div>
-            <button
-              onClick={logout}
-              className="btn-icon shrink-0"
-              title="התנתק"
-            >
-              <LogOut size={18} />
-            </button>
+                {firstLetter}
+              </div>
+            )}
+            {!collapsed && (
+              <>
+                <div className="flex-1 min-w-0">
+                  <p
+                    className="text-sm font-medium truncate"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {user.name}
+                  </p>
+                  <span
+                    className="text-xs px-1.5 py-0.5 rounded"
+                    style={{
+                      color: 'var(--accent)',
+                      background: 'var(--accent-subtle)',
+                    }}
+                  >
+                    {user.role === 'admin' ? 'אדמין' : 'משתמש'}
+                  </span>
+                </div>
+                <button
+                  onClick={logout}
+                  className="btn-icon shrink-0"
+                  title="התנתק"
+                >
+                  <LogOut size={18} />
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
-    </aside>
+    </>
+  );
+};
+
+export const Sidebar = () => {
+  const { isOpen, close, isCollapsed, toggleCollapse } = useSidebarStore();
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside
+        className="hidden md:flex glass-panel shrink-0 flex-col h-full overflow-hidden transition-all duration-300 ease-in-out relative"
+        style={{ width: isCollapsed ? '64px' : '256px' }}
+      >
+        <SidebarContent collapsed={isCollapsed} />
+
+        {/* Collapse toggle button */}
+        <button
+          onClick={toggleCollapse}
+          className="absolute top-5 -left-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 opacity-0 hover:opacity-100 group-hover:opacity-100"
+          style={{
+            background: 'var(--glass-bg)',
+            border: '1px solid var(--glass-border)',
+            color: 'var(--text-tertiary)',
+            left: '-12px',
+            opacity: 0.6,
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
+          title={isCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+        >
+          {isCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
+        </button>
+      </aside>
+
+      {/* Mobile backdrop */}
+      <div
+        className={`fixed inset-0 z-40 md:hidden transition-opacity duration-300 ${
+          isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+        }`}
+        style={{ background: 'rgba(0,0,0,0.4)' }}
+        onClick={close}
+      />
+
+      {/* Mobile drawer (from right — RTL) */}
+      <aside
+        className={`fixed inset-y-0 right-0 w-72 z-50 md:hidden flex flex-col overflow-hidden transition-transform duration-300 ease-out ${
+          isOpen ? 'translate-x-0' : 'translate-x-full'
+        }`}
+        style={{
+          background: 'var(--glass-bg)',
+          backdropFilter: 'blur(24px)',
+          WebkitBackdropFilter: 'blur(24px)',
+          borderInlineStart: '1px solid var(--glass-border)',
+        }}
+      >
+        {/* Close button */}
+        <div className="flex justify-start p-3">
+          <button
+            onClick={close}
+            className="btn-icon"
+            title="סגור תפריט"
+          >
+            <X size={20} />
+          </button>
+        </div>
+        <SidebarContent onNavClick={close} />
+      </aside>
+    </>
   );
 };

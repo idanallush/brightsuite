@@ -1,7 +1,7 @@
 const FB_API_VERSION = process.env.FB_API_VERSION || "v25.0";
-const FB_APP_ID = process.env.FB_APP_ID || "";
-const FB_APP_SECRET = process.env.FB_APP_SECRET || "";
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3333";
+const FB_APP_ID = process.env.FB_APP_ID;
+const FB_APP_SECRET = process.env.FB_APP_SECRET;
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
 const SCOPES = [
   "ads_read",
@@ -10,9 +10,17 @@ const SCOPES = [
   "pages_show_list",
 ].join(",");
 
+function requireFBCredentials() {
+  if (!FB_APP_ID || !FB_APP_SECRET) {
+    throw new Error("Missing FB_APP_ID or FB_APP_SECRET environment variables");
+  }
+  return { appId: FB_APP_ID, appSecret: FB_APP_SECRET };
+}
+
 export function getLoginUrl(csrfState: string): string {
+  const { appId } = requireFBCredentials();
   const params = new URLSearchParams({
-    client_id: FB_APP_ID,
+    client_id: appId,
     redirect_uri: `${BASE_URL}/api/ads/auth/callback`,
     scope: SCOPES,
     state: csrfState,
@@ -26,9 +34,10 @@ export async function exchangeCodeForToken(code: string): Promise<{
   token_type: string;
   expires_in: number;
 }> {
+  const { appId, appSecret } = requireFBCredentials();
   const params = new URLSearchParams({
-    client_id: FB_APP_ID,
-    client_secret: FB_APP_SECRET,
+    client_id: appId,
+    client_secret: appSecret,
     redirect_uri: `${BASE_URL}/api/ads/auth/callback`,
     code,
   });
@@ -50,10 +59,11 @@ export async function getLongLivedToken(shortLivedToken: string): Promise<{
   token_type: string;
   expires_in: number;
 }> {
+  const { appId, appSecret } = requireFBCredentials();
   const params = new URLSearchParams({
     grant_type: "fb_exchange_token",
-    client_id: FB_APP_ID,
-    client_secret: FB_APP_SECRET,
+    client_id: appId,
+    client_secret: appSecret,
     fb_exchange_token: shortLivedToken,
   });
 

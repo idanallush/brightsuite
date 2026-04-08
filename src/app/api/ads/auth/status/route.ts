@@ -17,6 +17,22 @@ export async function GET() {
     ? session.fbTokenExpiry - Date.now()
     : null;
 
+  // Check if token is expired
+  if (session.fbTokenExpiry && session.fbTokenExpiry < Date.now()) {
+    session.fbAccessToken = undefined;
+    session.fbTokenExpiry = undefined;
+    session.fbUserId = undefined;
+    session.fbUserName = undefined;
+    await session.save();
+    return NextResponse.json({
+      connected: false,
+      userName: "",
+      tokenExpiresIn: null,
+      accountCount: 0,
+      tokenExpired: true,
+    });
+  }
+
   // Fetch account count
   let accountCount = 0;
   try {
@@ -26,6 +42,19 @@ export async function GET() {
     if (res.ok) {
       const data = await res.json();
       accountCount = data.data?.length || 0;
+    } else if (res.status === 401 || res.status === 400) {
+      session.fbAccessToken = undefined;
+      session.fbTokenExpiry = undefined;
+      session.fbUserId = undefined;
+      session.fbUserName = undefined;
+      await session.save();
+      return NextResponse.json({
+        connected: false,
+        userName: "",
+        tokenExpiresIn: null,
+        accountCount: 0,
+        tokenExpired: true,
+      });
     }
   } catch {
     // Ignore - we'll just show 0

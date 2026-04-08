@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTurso } from '@/lib/db/turso';
+import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
-// GET /api/writer/clients/:id — single client
+// GET /api/writer/clients/:id — single client (shared data)
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const { id } = await params;
   try {
     const db = getTurso();
@@ -17,11 +21,14 @@ export async function GET(
   }
 }
 
-// PUT /api/writer/clients/:id — update client
+// PUT /api/writer/clients/:id — update client (shared data)
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const { id } = await params;
   const { name, initial, color, about, website, logo, winning_ads, avoid_notes } = await request.json();
   try {
@@ -52,11 +59,14 @@ export async function PUT(
   }
 }
 
-// DELETE /api/writer/clients/:id — delete client
+// DELETE /api/writer/clients/:id — delete client (shared data)
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const { id } = await params;
   try {
     const db = getTurso();

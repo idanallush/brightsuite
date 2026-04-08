@@ -37,7 +37,6 @@ export default function TeamPage() {
   // Form state
   const [formName, setFormName] = useState('');
   const [formEmail, setFormEmail] = useState('');
-  const [formPassword, setFormPassword] = useState('');
   const [formRole, setFormRole] = useState<UserRole>('viewer');
   const [formTools, setFormTools] = useState<ToolSlug[]>([]);
   const [formError, setFormError] = useState('');
@@ -64,7 +63,6 @@ export default function TeamPage() {
   const resetForm = () => {
     setFormName('');
     setFormEmail('');
-    setFormPassword('');
     setFormRole('viewer');
     setFormTools([]);
     setFormError('');
@@ -81,7 +79,6 @@ export default function TeamPage() {
     setEditingMember(member);
     setFormName(member.name);
     setFormEmail(member.email);
-    setFormPassword('');
     setFormRole(member.role);
     setFormTools(member.tools);
     setFormError('');
@@ -117,10 +114,6 @@ export default function TeamPage() {
           return;
         }
       } else {
-        if (!formPassword || formPassword.length < 6) {
-          setFormError('סיסמה חייבת להכיל לפחות 6 תווים');
-          return;
-        }
         const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -128,7 +121,6 @@ export default function TeamPage() {
             action: 'create',
             name: formName,
             email: formEmail,
-            password: formPassword,
             role: formRole,
             tools: formTools,
           }),
@@ -241,26 +233,6 @@ export default function TeamPage() {
                     type="email"
                     value={formEmail}
                     onChange={(e) => setFormEmail(e.target.value)}
-                    required
-                    className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-                    style={{
-                      background: 'rgba(255,255,255,0.6)',
-                      border: '1px solid var(--border)',
-                      color: 'var(--text-primary)',
-                    }}
-                  />
-                </div>
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    style={{ color: 'var(--text-secondary)' }}
-                  >
-                    סיסמה
-                  </label>
-                  <input
-                    type="password"
-                    value={formPassword}
-                    onChange={(e) => setFormPassword(e.target.value)}
                     required
                     className="w-full rounded-lg px-3 py-2 text-sm outline-none"
                     style={{

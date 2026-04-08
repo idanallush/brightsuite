@@ -193,12 +193,17 @@ body {
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   box-shadow: var(--card-shadow);
-  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  transition: box-shadow var(--transition-base), border-color var(--transition-base), transform 200ms ease;
 }
 
 .glass-card:hover {
   box-shadow: var(--glass-shadow);
   border-color: var(--glass-border-strong);
+  transform: translateY(-2px);
+}
+
+.glass-card:active {
+  transform: translateY(0);
 }
 
 .glass-elevated {

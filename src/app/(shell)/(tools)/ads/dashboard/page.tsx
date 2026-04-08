@@ -366,7 +366,7 @@ function SelectionSummaryBar({
 function AdLibraryContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { tools, loading: authLoading } = useAuth();
+  const { hasToolAccess, loading: authLoading } = useAuth();
 
   const { accounts, isLoading: accountsLoading } = useFacebookAccounts();
   const selectedAccountId = useAdStore((s) => s.selectedAccountId);
@@ -690,7 +690,7 @@ function AdLibraryContent() {
   ];
 
   // Permission check AFTER all hooks
-  if (!authLoading && !tools.includes('ads')) {
+  if (!authLoading && !hasToolAccess('ads')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <h2 className="text-base font-medium text-zinc-700 mb-1">אין גישה לכלי זה</h2>

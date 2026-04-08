@@ -2,12 +2,11 @@
  * BrightSuite DB Initialization Script
  * Run: npx tsx scripts/init-db.ts
  *
- * Creates all tables and the first admin user.
+ * Creates all tables and the first admin user (Google OAuth — no password needed).
  */
 
 import { createClient } from '@libsql/client';
 import { join } from 'path';
-import { hashSync } from 'bcryptjs';
 
 const db = createClient(
   process.env.TURSO_DATABASE_URL
@@ -16,16 +15,17 @@ const db = createClient(
 );
 
 async function init() {
-  console.log('🔧 Initializing BrightSuite database...\n');
+  console.log('Initializing BrightSuite database...\n');
 
-  // ═══ Shared tables (bs_ prefix) ═══
-  console.log('📦 Creating shared tables...');
+  // Shared tables (bs_ prefix)
+  console.log('Creating shared tables...');
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS bs_users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       email TEXT UNIQUE NOT NULL,
       name TEXT NOT NULL,
-      password_hash TEXT NOT NULL,
+      password_hash TEXT,
+      google_id TEXT UNIQUE,
       role TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin', 'manager', 'viewer')),
       avatar_url TEXT,
       is_active INTEGER DEFAULT 1,
@@ -67,14 +67,15 @@ async function init() {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE INDEX IF NOT EXISTS idx_bs_users_google_id ON bs_users(google_id);
     CREATE INDEX IF NOT EXISTS idx_bs_permissions_user ON bs_tool_permissions(user_id);
     CREATE INDEX IF NOT EXISTS idx_bs_audit_user ON bs_audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_bs_audit_tool ON bs_audit_log(tool_slug);
     CREATE INDEX IF NOT EXISTS idx_bs_audit_created ON bs_audit_log(created_at);
   `);
 
-  // ═══ MultiWrite tables ═══
-  console.log('📦 Creating MultiWrite tables...');
+  // MultiWrite tables
+  console.log('Creating MultiWrite tables...');
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,6 +98,7 @@ async function init() {
       campaign TEXT,
       platforms TEXT,
       language TEXT DEFAULT 'he',
+      created_by_user_id INTEGER REFERENCES bs_users(id),
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -117,12 +119,13 @@ async function init() {
       platform TEXT DEFAULT '',
       notes TEXT,
       is_global INTEGER DEFAULT 0,
+      created_by_user_id INTEGER REFERENCES bs_users(id),
       created_at TEXT DEFAULT (datetime('now'))
     );
   `);
 
-  // ═══ BudgetFlow tables (bf_ prefix) ═══
-  console.log('📦 Creating BudgetFlow tables...');
+  // BudgetFlow tables (bf_ prefix)
+  console.log('Creating BudgetFlow tables...');
   await db.executeMultiple(`
     CREATE TABLE IF NOT EXISTS bf_clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -175,6 +178,7 @@ async function init() {
       old_value TEXT,
       new_value TEXT,
       performed_by TEXT,
+      created_by_user_id INTEGER REFERENCES bs_users(id),
       performed_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -184,11 +188,9 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_bf_changelog_client ON bf_changelog(client_id);
   `);
 
-  // ═══ Create admin user ═══
-  console.log('\n👤 Creating admin user...');
-  const email = 'idan@bright.co.il';
-  const password = 'admin123'; // Change this!
-  const hash = hashSync(password, 12);
+  // Create admin user (will sign in via Google OAuth)
+  console.log('\nCreating admin user...');
+  const email = 'idan@b-bright.co.il';
 
   const existing = await db.execute({ sql: 'SELECT id FROM bs_users WHERE email = ?', args: [email] });
 
@@ -198,8 +200,8 @@ async function init() {
     console.log(`   User already exists (id: ${userId})`);
   } else {
     const result = await db.execute({
-      sql: 'INSERT INTO bs_users (email, name, password_hash, role) VALUES (?, ?, ?, ?) RETURNING id',
-      args: [email, 'עידן', hash, 'admin'],
+      sql: 'INSERT INTO bs_users (email, name, password_hash, role) VALUES (?, ?, NULL, ?) RETURNING id',
+      args: [email, 'עידן', 'admin'],
     });
     userId = result.rows[0].id as number;
     console.log(`   Created admin user: ${email} (id: ${userId})`);
@@ -215,11 +217,8 @@ async function init() {
   }
   console.log(`   Granted permissions: ${tools.join(', ')}`);
 
-  console.log('\n✅ Database initialized successfully!');
-  console.log(`\n📋 Login credentials:`);
-  console.log(`   Email: ${email}`);
-  console.log(`   Password: ${password}`);
-  console.log(`   ⚠️  Change the password after first login!\n`);
+  console.log('\nDatabase initialized successfully!');
+  console.log(`\nLogin: Sign in with Google using ${email}`);
 }
 
 init().catch(console.error);

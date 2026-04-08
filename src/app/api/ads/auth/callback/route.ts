@@ -16,18 +16,18 @@ export async function GET(request: NextRequest) {
 
   // Handle user denied permission
   if (error) {
-    return NextResponse.redirect(`${BASE_URL}?error=${error}`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=${error}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${BASE_URL}?error=no_code`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=no_code`);
   }
 
   const session = await getServerSession();
 
   // Validate CSRF state
   if (!state || state !== session.csrfState) {
-    return NextResponse.redirect(`${BASE_URL}?error=invalid_state`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=invalid_state`);
   }
 
   try {
@@ -56,11 +56,11 @@ export async function GET(request: NextRequest) {
     session.csrfState = undefined;
     await session.save();
 
-    return NextResponse.redirect(`${BASE_URL}/dashboard`);
+    return NextResponse.redirect(`${BASE_URL}/ads/dashboard`);
   } catch (err) {
     console.error("OAuth callback error:", err);
     return NextResponse.redirect(
-      `${BASE_URL}?error=auth_failed&message=${encodeURIComponent(
+      `${BASE_URL}/ads?error=auth_failed&message=${encodeURIComponent(
         err instanceof Error ? err.message : "Unknown error"
       )}`
     );
