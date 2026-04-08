@@ -52,18 +52,16 @@ const SidebarContent = ({
       <div className={`p-5 pb-4 overflow-hidden ${collapsed ? 'flex justify-center px-2' : ''}`}>
         {collapsed ? (
           <div
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold text-white"
-            style={{ background: 'var(--accent)' }}
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-bold"
+            style={{ background: '#FFDF4F', color: '#1a1a1a' }}
           >
             B
           </div>
         ) : (
           <>
-            <h1
-              className="text-lg font-semibold whitespace-nowrap"
-              style={{ color: 'var(--accent)' }}
-            >
-              BrightSuite
+            <h1 className="text-lg font-semibold whitespace-nowrap">
+              <span style={{ color: '#1a1a1a' }}>Bright</span>
+              <span style={{ color: '#FFDF4F' }}>Suite</span>
             </h1>
             <p
               className="text-xs mt-0.5 whitespace-nowrap"

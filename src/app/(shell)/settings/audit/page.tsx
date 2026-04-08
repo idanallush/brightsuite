@@ -18,7 +18,7 @@ const toolColorMap: Record<string, string> = {
   'ad-checker': '#8b5cf6',
   budget: '#16a34a',
   cpa: '#ea580c',
-  ads: '#2563eb',
+  ads: '#FFDF4F',
   writer: '#d946ef',
 };
 
@@ -106,8 +106,8 @@ export default function AuditPage() {
                 onClick={() => handleDaysChange(df.value)}
                 className="px-3 py-1.5 rounded-full text-xs font-medium transition-colors"
                 style={{
-                  background: isActive ? '#2563eb' : 'rgba(255,255,255,0.6)',
-                  color: isActive ? '#ffffff' : 'var(--text-secondary)',
+                  background: isActive ? '#FFDF4F' : 'rgba(255,255,255,0.6)',
+                  color: isActive ? '#1a1a1a' : 'var(--text-secondary)',
                   border: isActive ? 'none' : '1px solid var(--border)',
                 }}
               >

@@ -173,8 +173,8 @@ export default function TeamPage() {
         </h2>
         <button
           onClick={openCreate}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-opacity"
-          style={{ background: '#2563eb' }}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-opacity"
+          style={{ background: '#FFDF4F', color: '#1a1a1a' }}
         >
           <Plus size={16} />
           הוסף חבר צוות
@@ -289,9 +289,9 @@ export default function TeamPage() {
                           ? 'rgba(37,99,235,0.1)'
                           : 'rgba(255,255,255,0.6)',
                         border: checked
-                          ? '1px solid #2563eb'
+                          ? '1px solid #FFDF4F'
                           : '1px solid var(--border)',
-                        color: checked ? '#2563eb' : 'var(--text-secondary)',
+                        color: checked ? '#FFDF4F' : 'var(--text-secondary)',
                       }}
                     >
                       <input
@@ -320,8 +320,8 @@ export default function TeamPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="px-5 py-2 rounded-xl text-sm font-medium text-white transition-opacity disabled:opacity-50"
-                style={{ background: '#2563eb' }}
+                className="px-5 py-2 rounded-xl text-sm font-medium transition-opacity disabled:opacity-50"
+                style={{ background: '#FFDF4F', color: '#1a1a1a' }}
               >
                 {submitting
                   ? 'שומר...'
@@ -425,7 +425,7 @@ export default function TeamPage() {
                         className="inline-block text-xs px-2.5 py-0.5 rounded-full font-medium"
                         style={{
                           background: 'rgba(37,99,235,0.1)',
-                          color: '#2563eb',
+                          color: '#FFDF4F',
                         }}
                       >
                         {roleLabelMap[member.role] || member.role}
@@ -449,7 +449,7 @@ export default function TeamPage() {
                         <button
                           onClick={() => openEdit(member)}
                           className="p-1.5 rounded-lg transition-colors hover:opacity-70"
-                          style={{ color: '#2563eb' }}
+                          style={{ color: '#FFDF4F' }}
                           title="ערוך"
                         >
                           <Pencil size={15} />

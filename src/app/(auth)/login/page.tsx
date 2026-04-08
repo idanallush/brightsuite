@@ -20,11 +20,9 @@ function LoginContent() {
   return (
     <div className="glass-panel w-full max-w-md p-8">
       <div className="text-center mb-8">
-        <h1
-          className="text-2xl font-semibold"
-          style={{ color: 'var(--accent)' }}
-        >
-          BrightSuite
+        <h1 className="text-2xl font-semibold">
+          <span style={{ color: '#1a1a1a' }}>Bright</span>
+          <span style={{ color: '#FFDF4F' }}>Suite</span>
         </h1>
         <p
           className="mt-1 text-sm"

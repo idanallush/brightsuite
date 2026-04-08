@@ -2,7 +2,7 @@
 
 /* =============================================
    BrightSuite — Glass Light Design System
-   Accent: Blue #2563eb
+   Accent: Yellow #FFDF4F
    ============================================= */
 
 :root {
@@ -34,12 +34,12 @@
   --text-disabled: #c5c0b8;
   --text-inverse: #ffffff;
 
-  /* Accent — Blue */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-subtle: rgba(37, 99, 235, 0.15);
-  --accent-ring: rgba(37, 99, 235, 0.30);
-  --accent-text: #ffffff;
+  /* Accent — Yellow */
+  --accent: #FFDF4F;
+  --accent-hover: #f5d43a;
+  --accent-subtle: rgba(255, 223, 79, 0.18);
+  --accent-ring: rgba(255, 223, 79, 0.35);
+  --accent-text: #1a1a1a;
 
   /* Semantic — Success */
   --success: #16a34a;
