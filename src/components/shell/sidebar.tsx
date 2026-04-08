@@ -11,8 +11,8 @@ import {
   Image,
   PenLine,
   X,
-  ChevronsRight,
-  ChevronsLeft,
+  PanelRightClose,
+  PanelRightOpen,
   type LucideIcon,
 } from 'lucide-react';
 import { TOOLS } from '@/lib/tools';
@@ -30,9 +30,13 @@ const iconMap: Record<string, LucideIcon> = {
 const SidebarContent = ({
   collapsed = false,
   onNavClick,
+  showCollapseButton = false,
+  onToggleCollapse,
 }: {
   collapsed?: boolean;
   onNavClick?: () => void;
+  showCollapseButton?: boolean;
+  onToggleCollapse?: () => void;
 }) => {
   const pathname = usePathname();
   const { user, logout, hasToolAccess } = useAuth();
@@ -133,7 +137,6 @@ const SidebarContent = ({
 
         {user && (
           <div className={`flex items-center gap-3 py-2 ${collapsed ? 'justify-center px-1' : 'px-3'}`}>
-            {/* Avatar */}
             {user.avatarUrl ? (
               <img
                 src={user.avatarUrl}
@@ -179,6 +182,29 @@ const SidebarContent = ({
             )}
           </div>
         )}
+
+        {/* Collapse toggle — prominent, at the bottom */}
+        {showCollapseButton && onToggleCollapse && (
+          <>
+            <div
+              className="mx-1 mt-1"
+              style={{ borderBottom: '1px solid var(--glass-border)', opacity: 0.5 }}
+            />
+            <button
+              onClick={onToggleCollapse}
+              title={collapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
+              className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-200 ${
+                collapsed ? 'justify-center px-2' : 'px-3'
+              }`}
+              style={{ color: 'var(--text-tertiary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--accent)'; e.currentTarget.style.background = 'var(--accent-subtle)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent'; }}
+            >
+              {collapsed ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+              {!collapsed && <span className="text-sm font-medium whitespace-nowrap">כווץ תפריט</span>}
+            </button>
+          </>
+        )}
       </div>
     </>
   );
@@ -189,30 +215,16 @@ export const Sidebar = () => {
 
   return (
     <>
-      {/* Desktop sidebar */}
+      {/* Desktop sidebar — full height */}
       <aside
-        className="hidden md:flex glass-panel shrink-0 flex-col h-full overflow-hidden transition-all duration-300 ease-in-out relative"
+        className="hidden md:flex glass-panel shrink-0 flex-col h-screen sticky top-0 overflow-hidden transition-all duration-300 ease-in-out"
         style={{ width: isCollapsed ? '64px' : '256px' }}
       >
-        <SidebarContent collapsed={isCollapsed} />
-
-        {/* Collapse toggle button */}
-        <button
-          onClick={toggleCollapse}
-          className="absolute top-5 -left-0 w-6 h-6 rounded-full flex items-center justify-center transition-all duration-200 opacity-0 hover:opacity-100 group-hover:opacity-100"
-          style={{
-            background: 'var(--glass-bg)',
-            border: '1px solid var(--glass-border)',
-            color: 'var(--text-tertiary)',
-            left: '-12px',
-            opacity: 0.6,
-          }}
-          onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; }}
-          title={isCollapsed ? 'הרחב תפריט' : 'כווץ תפריט'}
-        >
-          {isCollapsed ? <ChevronsRight size={14} /> : <ChevronsLeft size={14} />}
-        </button>
+        <SidebarContent
+          collapsed={isCollapsed}
+          showCollapseButton
+          onToggleCollapse={toggleCollapse}
+        />
       </aside>
 
       {/* Mobile backdrop */}
@@ -236,7 +248,6 @@ export const Sidebar = () => {
           borderInlineStart: '1px solid var(--glass-border)',
         }}
       >
-        {/* Close button */}
         <div className="flex justify-start p-3">
           <button
             onClick={close}

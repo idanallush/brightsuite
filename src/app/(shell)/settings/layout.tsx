@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { User, Users, ClipboardList } from 'lucide-react';
+import { User, Users, ClipboardList, Link2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { motion } from 'motion/react';
 
@@ -16,6 +16,7 @@ interface TabItem {
 const tabs: TabItem[] = [
   { label: 'פרופיל', href: '/settings', icon: User },
   { label: 'ניהול צוות', href: '/settings/team', icon: Users, adminOnly: true },
+  { label: 'חיבורים', href: '/settings/connections', icon: Link2 },
   { label: 'לוג פעילות', href: '/settings/audit', icon: ClipboardList },
 ];
 

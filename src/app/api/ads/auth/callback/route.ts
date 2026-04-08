@@ -5,6 +5,7 @@ import {
   getLongLivedToken,
   getUserProfile,
 } from "@/lib/facebook/auth";
+import { saveFbConnection } from "@/lib/facebook/connection";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
@@ -48,13 +49,21 @@ export async function GET(request: NextRequest) {
       console.warn("Profile fetch failed, continuing with defaults:", profileErr);
     }
 
-    // Store in BrightSuite session
+    // Store in BrightSuite session (backward compat)
     session.fbAccessToken = longLived.access_token;
     session.fbTokenExpiry = Date.now() + longLived.expires_in * 1000;
     session.fbUserId = profileId;
     session.fbUserName = profileName;
     session.csrfState = undefined;
     await session.save();
+
+    // Save to DB — unified storage for all tools
+    await saveFbConnection(session.userId!, {
+      fbUserId: profileId,
+      fbUserName: profileName,
+      accessToken: longLived.access_token,
+      expiresIn: longLived.expires_in,
+    });
 
     return NextResponse.redirect(`${BASE_URL}/ads/dashboard`);
   } catch (err) {
