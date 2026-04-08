@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { ToastContainer } from '@/components/ui/toast';
+import { useRouteMemory } from '@/hooks/use-route-memory';
 
 /**
  * Global SWR cache provider that persists across navigation.
@@ -26,6 +27,7 @@ export default function ShellLayout({
   const router = useRouter();
   const { user, loading } = useAuth();
   const cacheProvider = useGlobalSWRCache();
+  useRouteMemory();
 
   useEffect(() => {
     if (!loading && !user) {

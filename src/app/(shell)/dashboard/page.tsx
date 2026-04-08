@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { TOOLS } from '@/lib/tools';
+import { useLastRouteStore } from '@/stores/last-route';
 
 const iconMap: Record<string, LucideIcon> = {
   Shield,
@@ -33,6 +34,7 @@ const getGreeting = (): string => {
 
 export default function DashboardPage() {
   const { user, hasToolAccess } = useAuth();
+  const getLastRoute = useLastRouteStore((s) => s.getLastRoute);
 
   const accessibleTools = TOOLS.filter((tool) => hasToolAccess(tool.slug));
   const greeting = getGreeting();
@@ -118,7 +120,7 @@ export default function DashboardPage() {
                 }}
               >
                 <Link
-                  href={tool.href}
+                  href={getLastRoute(tool.href) || tool.href}
                   className="glass-card block p-5 group"
                 >
                   <div className="flex items-start gap-4">

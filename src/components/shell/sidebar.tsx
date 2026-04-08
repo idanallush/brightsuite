@@ -18,6 +18,7 @@ import {
 import { TOOLS } from '@/lib/tools';
 import { useAuth } from '@/hooks/use-auth';
 import { useSidebarStore } from '@/stores/sidebar';
+import { useLastRouteStore } from '@/stores/last-route';
 
 const iconMap: Record<string, LucideIcon> = {
   Shield,
@@ -40,6 +41,7 @@ const SidebarContent = ({
 }) => {
   const pathname = usePathname();
   const { user, logout, hasToolAccess } = useAuth();
+  const getLastRoute = useLastRouteStore((s) => s.getLastRoute);
 
   const accessibleTools = TOOLS.filter((tool) => hasToolAccess(tool.slug));
   const firstLetter = user?.name?.charAt(0) || '?';
@@ -84,11 +86,12 @@ const SidebarContent = ({
         {accessibleTools.map((tool) => {
           const Icon = iconMap[tool.icon] || Shield;
           const isActive = pathname.startsWith(tool.href);
+          const smartHref = getLastRoute(tool.href) || tool.href;
 
           return (
             <Link
               key={tool.slug}
-              href={tool.href}
+              href={smartHref}
               onClick={onNavClick}
               title={collapsed ? tool.name : undefined}
               className={`flex items-center gap-3 py-2.5 rounded-xl transition-all duration-200 ${
