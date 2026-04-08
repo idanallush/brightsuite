@@ -29,7 +29,7 @@ export const SyncProgress = ({
         animate={{ rotate: 360 }}
         transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
       >
-        <RefreshCw size={24} style={{ color: 'var(--accent)' }} />
+        <RefreshCw size={24} style={{ color: 'var(--accent-fg)' }} />
       </motion.div>
 
       <div className="text-center">
@@ -84,7 +84,7 @@ export const SyncIndicator = ({ message = 'מסנכרן...' }: { message?: strin
       animate={{ rotate: 360 }}
       transition={{ repeat: Infinity, duration: 1.5, ease: 'linear' }}
     >
-      <RefreshCw size={14} style={{ color: 'var(--accent)' }} />
+      <RefreshCw size={14} style={{ color: 'var(--accent-fg)' }} />
     </motion.div>
     <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
       {message}

@@ -129,7 +129,7 @@ export default function ClientModal({ client, onSave, onClose }) {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 className="text-sm hover:underline"
-                style={{ color: 'var(--accent)' }}
+                style={{ color: 'var(--accent-fg)' }}
               >
                 {form.logo ? 'החלף לוגו' : 'העלה לוגו'}
               </button>

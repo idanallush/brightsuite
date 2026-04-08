@@ -61,7 +61,7 @@ const SidebarContent = ({
           <>
             <h1 className="text-lg font-semibold whitespace-nowrap">
               <span style={{ color: '#1a1a1a' }}>Bright</span>
-              <span style={{ color: '#FFDF4F' }}>Suite</span>
+              <span style={{ color: '#D4A017' }}>Suite</span>
             </h1>
             <p
               className="text-xs mt-0.5 whitespace-nowrap"
@@ -97,7 +97,7 @@ const SidebarContent = ({
               }`}
               style={{
                 background: isActive ? 'var(--accent-subtle)' : undefined,
-                color: isActive ? 'var(--accent)' : 'var(--text-secondary)',
+                color: isActive ? 'var(--accent-fg)' : 'var(--text-secondary)',
                 borderInlineStart: isActive
                   ? '3px solid var(--accent)'
                   : '3px solid transparent',
@@ -129,7 +129,7 @@ const SidebarContent = ({
           }`}
           style={{
             background: pathname.startsWith('/settings') ? 'var(--accent-subtle)' : undefined,
-            color: pathname.startsWith('/settings') ? 'var(--accent)' : 'var(--text-secondary)',
+            color: pathname.startsWith('/settings') ? 'var(--accent-fg)' : 'var(--text-secondary)',
           }}
         >
           <Settings size={18} className="shrink-0" />
@@ -165,7 +165,7 @@ const SidebarContent = ({
                   <span
                     className="text-xs px-1.5 py-0.5 rounded"
                     style={{
-                      color: 'var(--accent)',
+                      color: 'var(--accent-fg)',
                       background: 'var(--accent-subtle)',
                     }}
                   >

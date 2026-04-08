@@ -425,7 +425,7 @@ export default function TeamPage() {
                         className="inline-block text-xs px-2.5 py-0.5 rounded-full font-medium"
                         style={{
                           background: 'rgba(37,99,235,0.1)',
-                          color: '#FFDF4F',
+                          color: '#1a1a1a',
                         }}
                       >
                         {roleLabelMap[member.role] || member.role}
@@ -449,7 +449,7 @@ export default function TeamPage() {
                         <button
                           onClick={() => openEdit(member)}
                           className="p-1.5 rounded-lg transition-colors hover:opacity-70"
-                          style={{ color: '#FFDF4F' }}
+                          style={{ color: '#1a1a1a' }}
                           title="ערוך"
                         >
                           <Pencil size={15} />

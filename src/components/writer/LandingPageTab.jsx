@@ -16,7 +16,7 @@ function HeroCard({ opt, index, onRegenerate }) {
   return (
     <div className="group glass-card p-6 text-center relative">
       <div className="flex items-center justify-between mb-3">
-        <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'rgba(101, 105, 167, 0.3)' }}>
+        <span className="text-[11px] font-medium px-2.5 py-1 rounded-full border" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-fg)', borderColor: 'rgba(101, 105, 167, 0.3)' }}>
           OPTION {String(index + 1).padStart(2, '0')}
         </span>
         <div className="flex items-center gap-2">

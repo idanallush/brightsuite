@@ -6,7 +6,7 @@ export default function LoadingState() {
       {/* Animated icon */}
       <div className="relative mb-6">
         <div className="w-16 h-16 rounded-2xl flex items-center justify-center animate-pulse" style={{ background: 'var(--accent-subtle)' }}>
-          <PenSquare className="w-8 h-8" style={{ color: 'var(--accent)' }} />
+          <PenSquare className="w-8 h-8" style={{ color: 'var(--accent-fg)' }} />
         </div>
         <div className="absolute inset-0 w-16 h-16 rounded-2xl animate-ping" style={{ background: 'var(--accent-subtle)', opacity: 0.5 }} />
       </div>

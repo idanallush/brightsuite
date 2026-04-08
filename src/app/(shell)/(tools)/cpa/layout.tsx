@@ -30,7 +30,7 @@ function CpaNav() {
               href={item.href}
               className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors"
               style={{
-                color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                color: active ? 'var(--accent-fg)' : 'var(--text-secondary)',
                 borderBottomColor: active ? 'var(--accent)' : 'transparent',
               }}
             >

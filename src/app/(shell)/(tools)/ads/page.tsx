@@ -40,7 +40,7 @@ export default function AdsPage() {
   if (loading || (!fbChecked && !fbConnected)) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--accent)' }} />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--accent-fg)' }} />
       </div>
     );
   }

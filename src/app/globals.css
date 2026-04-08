@@ -39,7 +39,8 @@
   --accent-hover: #f5d43a;
   --accent-subtle: rgba(255, 223, 79, 0.18);
   --accent-ring: rgba(255, 223, 79, 0.35);
-  --accent-text: #1a1a1a;
+  --accent-text: #1a1a1a;          /* text ON accent bg */
+  --accent-fg: #1a1a1a;            /* accent-colored text on light bg — must pass 4.5:1 */
 
   /* Semantic — Success */
   --success: #16a34a;
@@ -382,7 +383,7 @@ body {
   font-weight: 500;
   border-radius: var(--radius-full);
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-fg);
 }
 
 /* Skeleton loader */

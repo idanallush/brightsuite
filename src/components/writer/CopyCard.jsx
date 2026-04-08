@@ -47,7 +47,7 @@ export default function CopyCard({ text, badge, badgeColor = 'blue', charLimit, 
           {badge && (
             <span
               className={`text-[11px] font-medium px-2.5 py-1 rounded-full border ${badgeStyles[badgeColor]}`}
-              style={badgeColor === 'blue' ? { background: 'var(--accent-subtle)', color: 'var(--accent)' } : { background: 'rgba(255,255,255,0.05)' }}
+              style={badgeColor === 'blue' ? { background: 'var(--accent-subtle)', color: 'var(--accent-fg)' } : { background: 'rgba(255,255,255,0.05)' }}
             >
               {badge}
             </span>

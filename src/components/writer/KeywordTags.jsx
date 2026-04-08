@@ -30,7 +30,7 @@ export default function KeywordTags({ keywords, onChange, onRegenerateAll, regen
   return (
     <div className="mb-6">
       <div className="flex items-center gap-2 mb-2">
-        <Search className="w-4 h-4" style={{ color: 'var(--accent)' }} />
+        <Search className="w-4 h-4" style={{ color: 'var(--accent-fg)' }} />
         <label className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>מילות מפתח / ביטויי חיפוש</label>
         <span className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>(יוזנו לפרומפט בעת ייצור מחדש)</span>
       </div>

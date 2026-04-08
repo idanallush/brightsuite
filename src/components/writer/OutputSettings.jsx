@@ -67,7 +67,7 @@ export default function OutputSettings({ language, onLanguageChange, activePlatf
                   }`}
                   style={
                     isActive
-                      ? { background: 'var(--accent-subtle)', color: 'var(--accent)', borderColor: 'rgba(var(--accent-rgb, 101,105,167), 0.3)' }
+                      ? { background: 'var(--accent-subtle)', color: 'var(--accent-fg)', borderColor: 'rgba(var(--accent-rgb, 101,105,167), 0.3)' }
                       : { background: 'var(--card-bg)', color: 'var(--text-secondary)' }
                   }
                 >

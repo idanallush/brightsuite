@@ -309,8 +309,8 @@ export default function WriterGeneratePage() {
               className="w-full flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>בריף AI — {analyzedBrief.business_name || 'ניתוח אתר'}</span>
+                <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-fg)' }} />
+                <span className="text-[13px] font-semibold" style={{ color: 'var(--accent-fg)' }}>בריף AI — {analyzedBrief.business_name || 'ניתוח אתר'}</span>
               </div>
               {showBriefDetails ? (
                 <ChevronUp className="w-4 h-4 text-[#1877F2]/70" />
@@ -367,7 +367,7 @@ export default function WriterGeneratePage() {
                 {analyzedBrief.key_phrases?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {analyzedBrief.key_phrases.map((phrase: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 bg-white/5 rounded-full text-[11px] border border-[#1877F2]/25" style={{ color: 'var(--accent)' }}>
+                      <span key={i} className="px-2 py-0.5 bg-white/5 rounded-full text-[11px] border border-[#1877F2]/25" style={{ color: 'var(--accent-fg)' }}>
                         {phrase}
                       </span>
                     ))}
