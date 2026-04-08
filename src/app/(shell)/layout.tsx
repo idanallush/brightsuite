@@ -1,11 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { SWRConfig } from 'swr';
 import { useAuth } from '@/hooks/use-auth';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { ToastContainer } from '@/components/ui/toast';
+
+/**
+ * Global SWR cache provider that persists across navigation.
+ * Without this, SWR cache is lost when components unmount (navigating between tools).
+ */
+function useGlobalSWRCache() {
+  const cacheRef = useRef(new Map());
+  const provider = useCallback(() => cacheRef.current, []);
+  return provider;
+}
 
 export default function ShellLayout({
   children,
@@ -14,6 +25,7 @@ export default function ShellLayout({
 }) {
   const router = useRouter();
   const { user, loading } = useAuth();
+  const cacheProvider = useGlobalSWRCache();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -42,13 +54,22 @@ export default function ShellLayout({
   }
 
   return (
-    <div className="page-bg min-h-screen flex">
-      <Sidebar />
-      <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
-        <Topbar />
-        <main className="flex-1 p-4 md:p-6">{children}</main>
+    <SWRConfig
+      value={{
+        provider: cacheProvider,
+        revalidateOnFocus: false,
+        revalidateOnReconnect: false,
+        dedupingInterval: 300000, // 5 minutes — don't re-fetch if same key was fetched recently
+      }}
+    >
+      <div className="page-bg min-h-screen flex">
+        <Sidebar />
+        <div className="flex-1 flex flex-col min-h-screen min-w-0 transition-all duration-300">
+          <Topbar />
+          <main className="flex-1 p-4 md:p-6">{children}</main>
+        </div>
+        <ToastContainer />
       </div>
-      <ToastContainer />
-    </div>
+    </SWRConfig>
   );
 }

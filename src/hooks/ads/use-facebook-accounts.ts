@@ -17,7 +17,8 @@ const fetcher = async (url: string) => {
 export function useFacebookAccounts() {
   const { data, error, isLoading } = useSWR("/api/ads/facebook/accounts", fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 60000, // 1 minute
+    dedupingInterval: 3600000, // 1 hour — accounts rarely change
+    revalidateIfStale: false,
   });
 
   return {

@@ -74,7 +74,8 @@ function DashboardContent() {
     cardsFetcher,
     {
       revalidateOnFocus: false,
-      dedupingInterval: 30000,
+      dedupingInterval: 600000, // 10 minutes — keep data cached between tool switches
+      revalidateIfStale: false,
       onSuccess: () => {
         setLastUpdated(
           new Date().toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })
