@@ -14,6 +14,8 @@ import { DashboardGrid } from "@/components/cpa/dashboard/dashboard-grid";
 import { Button } from "@/components/cpa/ui/button";
 import { Card } from "@/components/cpa/ui/card";
 import { Skeleton } from "@/components/cpa/ui/skeleton";
+import { SyncProgress } from "@/components/ui/sync-progress";
+import { HelpTip } from "@/components/ui/help-tip";
 import type { ClientCardData } from "@/lib/cpa/types/dashboard";
 
 async function cardsFetcher(url: string): Promise<ClientCardData[]> {
@@ -101,14 +103,7 @@ function DashboardContent() {
   // Permission check AFTER all hooks
   if (loading) {
     return (
-      <div className="space-y-6">
-        <Skeleton className="h-9 w-80" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-48 w-full rounded-xl" />
-          ))}
-        </div>
-      </div>
+      <SyncProgress message="מסנכרן נתוני CPA..." subtitle="טוען מדדים מפייסבוק" />
     );
   }
 
@@ -128,6 +123,7 @@ function DashboardContent() {
     <div className="space-y-6">
       <div className="flex flex-row-reverse flex-wrap gap-3 items-center">
         <DateRangePicker onDateRangeChange={handleDateRangeChange} />
+        <HelpTip text="בחר את התקופה לחישוב עלות לליד. השוואה מתבצעת מול היעדים שהוגדרו." />
         <div className="flex-1" />
         <Button
           variant="outline"
@@ -146,6 +142,7 @@ function DashboardContent() {
           )}
           <span className="hidden sm:inline">רענון</span>
         </Button>
+        <HelpTip text="רענון ידני מושך נתונים עדכניים מפייסבוק. הנתונים מתעדכנים אוטומטית כל 10 דקות." />
 
         {data && data.length > 0 && (
           <span className="text-sm text-muted-foreground">
@@ -156,25 +153,7 @@ function DashboardContent() {
       </div>
 
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="rounded-xl shadow-sm overflow-hidden">
-              <div className="h-1 bg-muted" />
-              <div className="p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <Skeleton className="h-5 w-28" />
-                  <Skeleton className="h-5 w-16 rounded-full" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <Skeleton className="h-12 w-full rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-lg" />
-                  <Skeleton className="h-12 w-full rounded-lg" />
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <SyncProgress message="מסנכרן נתוני CPA..." subtitle="טוען מדדים מפייסבוק" />
       ) : error ? (
         <ErrorBanner
           message={error.message || "שגיאה בטעינת הנתונים"}
@@ -192,12 +171,15 @@ function DashboardContent() {
                 עבור להגדרות כדי לחבר חשבונות פייסבוק ולהפעיל לקוחות
               </p>
             </div>
-            <Button asChild className="bg-[#1877F2] hover:bg-[#1565C0] text-white">
-              <Link href="/cpa/settings">
-                <Settings className="h-4 w-4" />
-                עבור להגדרות
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild className="bg-[#1877F2] hover:bg-[#1565C0] text-white">
+                <Link href="/cpa/settings">
+                  <Settings className="h-4 w-4" />
+                  עבור להגדרות
+                </Link>
+              </Button>
+              <HelpTip text="הגדר לקוחות, יעדי CPA וחיבור חשבון פייסבוק." />
+            </div>
           </div>
         </Card>
       ) : (

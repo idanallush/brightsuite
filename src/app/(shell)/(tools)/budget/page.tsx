@@ -13,6 +13,8 @@ import { Input } from '@/components/budget/ui/Input'
 import { MetricCard } from '@/components/budget/ui/MetricCard'
 import { PlatformIcon } from '@/components/budget/ui/PlatformIcon'
 import { SkeletonCard } from '@/components/budget/ui/Skeleton'
+import { SyncProgress } from '@/components/ui/sync-progress'
+import { HelpTip } from '@/components/ui/help-tip'
 import { EmptyState } from '@/components/budget/ui/EmptyState'
 import { Dialog } from '@/components/budget/ui/Dialog'
 import { formatCurrency } from '@/lib/budget/format'
@@ -40,9 +42,12 @@ const ClientCard = ({ client }: { client: { id: string; name: string; slug: stri
               {activeCampaigns.length} קמפיינים פעילים
             </p>
           </div>
-          <span className="text-2xl font-semibold text-accent">
-            {formatCurrency(totalForecast)}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <HelpTip text="התחזית מחושבת לפי התקציב היומי × ימים שנותרו בחודש." position="top" size={13} />
+            <span className="text-2xl font-semibold text-accent">
+              {formatCurrency(totalForecast)}
+            </span>
+          </div>
         </div>
 
         <div className="flex gap-4">
@@ -127,7 +132,10 @@ export default function BudgetDashboardPage() {
       {/* Header + Search */}
       <GlassPanel className="p-6">
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-2xl font-semibold leading-tight">לקוחות</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-semibold leading-tight">לקוחות</h1>
+            <HelpTip text="הוסף לקוח חדש וצור לו קמפיינים עם תקציב יומי. התחזית החודשית מחושבת אוטומטית." />
+          </div>
           <Button onClick={() => setShowAddDialog(true)}>
             <Plus size={18} />
             הוסף לקוח
@@ -135,26 +143,25 @@ export default function BudgetDashboardPage() {
         </div>
 
         <div className="mb-5">
-          <div className="relative">
-            <Search
-              size={18}
-              className="absolute start-4 top-1/2 -translate-y-1/2 text-text-muted"
-            />
-            <input
-              className="glass-input !ps-11"
-              placeholder="חיפוש לקוח..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search
+                size={18}
+                className="absolute start-4 top-1/2 -translate-y-1/2 text-text-muted"
+              />
+              <input
+                className="glass-input !ps-11"
+                placeholder="חיפוש לקוח..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <HelpTip text="חפש לקוחות לפי שם. לחץ על כרטיס לקוח לצפייה בקמפיינים." />
           </div>
         </div>
 
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
+          <SyncProgress message="טוען לקוחות..." subtitle="מסנכרן נתוני תקציב" />
         ) : filteredClients.length === 0 ? (
           <EmptyState
             icon={<Users size={40} />}
