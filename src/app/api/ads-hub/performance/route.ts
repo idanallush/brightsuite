@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const db = getTurso();
 
   const conditions = ['p.client_id = ?', 'p.date BETWEEN ? AND ?'];
-  const args: (string | number)[] = [clientId, startDate, endDate];
+  const args: (string | number)[] = [Number(clientId), startDate, endDate];
 
   if (platform) {
     conditions.push('p.platform = ?');

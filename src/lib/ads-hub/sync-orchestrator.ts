@@ -37,24 +37,32 @@ export async function runDailySync(): Promise<{
     const syncs: SyncResult[] = [];
 
     // Google Ads
-    if (client.google_customer_id && googleAdsService.isServiceAvailable()) {
-      const mccId = client.google_mcc_id || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '';
-      const result = await googleAdsService.syncDailyMetrics(
-        client.id,
-        client.google_customer_id,
-        mccId,
-        yesterday,
-        yesterday
-      );
-      syncs.push(result);
+    if (client.google_customer_id) {
+      if (googleAdsService.isServiceAvailable()) {
+        const mccId = client.google_mcc_id || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '';
+        const result = await googleAdsService.syncDailyMetrics(
+          client.id,
+          client.google_customer_id,
+          mccId,
+          yesterday,
+          yesterday
+        );
+        syncs.push(result);
+      } else {
+        syncs.push({ platform: 'google', status: 'skipped', recordsSynced: 0, error: 'Google Ads not configured (missing env vars)' });
+      }
     }
 
     // Meta Ads
     if (client.meta_account_id) {
       const metaAvailable = await metaAdsService.isServiceAvailable();
-      if (metaAvailable) {
+      if (!metaAvailable) {
+        syncs.push({ platform: 'meta', status: 'skipped', recordsSynced: 0, error: 'No active Facebook connection' });
+      } else {
         const accessToken = await metaAdsService.getActiveAccessToken();
-        if (accessToken) {
+        if (!accessToken) {
+          syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: 'Facebook access token not found' });
+        } else {
           const result = await metaAdsService.syncDailyMetrics(
             client.id,
             client.meta_account_id,
@@ -64,26 +72,34 @@ export async function runDailySync(): Promise<{
           );
           syncs.push(result);
 
-          // Discover new video ads
-          const videoResult = await metaAdsService.discoverVideoAds(
-            client.id,
-            client.meta_account_id,
-            accessToken
-          );
-          syncs.push(videoResult);
+          // Discover new video ads (don't fail the whole sync if this errors)
+          try {
+            const videoResult = await metaAdsService.discoverVideoAds(
+              client.id,
+              client.meta_account_id,
+              accessToken
+            );
+            syncs.push(videoResult);
+          } catch {
+            syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: 'Video discovery failed' });
+          }
         }
       }
     }
 
     // GA4
-    if (client.ga4_property_id && ga4Service.isServiceAvailable()) {
-      const result = await ga4Service.syncDailyMetrics(
-        client.id,
-        client.ga4_property_id,
-        yesterday,
-        yesterday
-      );
-      syncs.push(result);
+    if (client.ga4_property_id) {
+      if (ga4Service.isServiceAvailable()) {
+        const result = await ga4Service.syncDailyMetrics(
+          client.id,
+          client.ga4_property_id,
+          yesterday,
+          yesterday
+        );
+        syncs.push(result);
+      } else {
+        syncs.push({ platform: 'ga4', status: 'skipped', recordsSynced: 0, error: 'GA4 not configured (missing env vars)' });
+      }
     }
 
     allResults.push({ clientName: client.name, syncs });

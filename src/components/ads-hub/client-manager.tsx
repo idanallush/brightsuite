@@ -1,12 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, RefreshCw, ChevronDown, Loader2 } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, Loader2, Pencil, Trash2, X, Check } from 'lucide-react';
 import { useOverview } from '@/hooks/ads-hub/use-overview';
-import { useFacebookAccounts } from '@/hooks/ads/use-facebook-accounts';
+import { useFacebookAccounts } from '@/hooks/ads-hub/use-facebook-accounts';
 import { useGoogleAccounts } from '@/hooks/ads-hub/use-google-accounts';
 import { toast } from 'sonner';
 import { useDashboardStore } from '@/stores/ads-hub/dashboard-store';
+
+interface ClientFormData {
+  name: string;
+  slug: string;
+  metaAccountId: string;
+  googleCustomerId: string;
+  googleMccId: string;
+  ga4PropertyId: string;
+}
+
+const emptyForm: ClientFormData = {
+  name: '',
+  slug: '',
+  metaAccountId: '',
+  googleCustomerId: '',
+  googleMccId: '',
+  ga4PropertyId: '',
+};
 
 export const ClientManager = () => {
   const { startDate, endDate } = useDashboardStore();
@@ -18,14 +36,9 @@ export const ClientManager = () => {
 
   const [showForm, setShowForm] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [form, setForm] = useState({
-    name: '',
-    slug: '',
-    metaAccountId: '',
-    googleCustomerId: '',
-    googleMccId: '',
-    ga4PropertyId: '',
-  });
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [form, setForm] = useState<ClientFormData>(emptyForm);
 
   const handleAdd = async () => {
     if (!form.name || !form.slug) {
@@ -48,10 +61,71 @@ export const ClientManager = () => {
 
       toast.success('לקוח נוסף בהצלחה');
       setShowForm(false);
-      setForm({ name: '', slug: '', metaAccountId: '', googleCustomerId: '', googleMccId: '', ga4PropertyId: '' });
+      setForm(emptyForm);
       mutate();
     } catch {
       toast.error('שגיאה ביצירת לקוח');
+    }
+  };
+
+  const handleEdit = (client: Record<string, unknown>) => {
+    setEditingId(client.id as number);
+    setForm({
+      name: (client.name as string) || '',
+      slug: (client.slug as string) || '',
+      metaAccountId: (client.meta_account_id as string) || '',
+      googleCustomerId: (client.google_customer_id as string) || '',
+      googleMccId: (client.google_mcc_id as string) || '',
+      ga4PropertyId: (client.ga4_property_id as string) || '',
+    });
+    setShowForm(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingId || !form.name) {
+      toast.error('שם הלקוח הוא שדה חובה');
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/ads-hub/clients/${editingId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'שגיאה בעדכון לקוח');
+        return;
+      }
+
+      toast.success('לקוח עודכן בהצלחה');
+      setEditingId(null);
+      setForm(emptyForm);
+      mutate();
+    } catch {
+      toast.error('שגיאה בעדכון לקוח');
+    }
+  };
+
+  const handleDelete = async (clientId: number) => {
+    try {
+      const res = await fetch(`/api/ads-hub/clients/${clientId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'שגיאה במחיקת לקוח');
+        return;
+      }
+
+      toast.success('לקוח נמחק בהצלחה');
+      setDeletingId(null);
+      mutate();
+    } catch {
+      toast.error('שגיאה במחיקת לקוח');
     }
   };
 
@@ -61,7 +135,20 @@ export const ClientManager = () => {
       const res = await fetch('/api/ads-hub/sync', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
-        toast.success(`סנכרון הושלם: ${data.clients} לקוחות`);
+        const errors = data.results?.flatMap(
+          (r: { syncs: Array<{ status: string; error?: string; platform: string }> }) =>
+            r.syncs.filter((s) => s.status === 'error').map((s) => `${s.platform}: ${s.error}`)
+        ) || [];
+
+        if (errors.length > 0) {
+          toast.warning(`סנכרון הושלם עם ${errors.length} שגיאות`, {
+            description: errors.join('\n'),
+            duration: 8000,
+          });
+        } else {
+          toast.success(`סנכרון הושלם: ${data.clients} לקוחות`);
+        }
+        mutate();
       } else {
         toast.error(data.error || 'שגיאה בסנכרון');
       }
@@ -72,13 +159,17 @@ export const ClientManager = () => {
     }
   };
 
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+  };
+
   const selectStyle = {
     background: 'var(--glass-bg)',
     borderColor: 'var(--glass-border)',
     color: 'var(--text-primary)',
   };
 
-  // Find which FB/Google accounts are already assigned to existing clients
   const usedMetaIds = new Set(
     clients.map((c: Record<string, unknown>) => c.meta_account_id as string).filter(Boolean)
   );
@@ -86,12 +177,165 @@ export const ClientManager = () => {
     clients.map((c: Record<string, unknown>) => c.google_customer_id as string).filter(Boolean)
   );
 
+  const renderAccountFields = (isEdit = false) => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>שם לקוח *</label>
+        <input
+          type="text"
+          value={form.name}
+          onChange={(e) => setForm({ ...form, name: e.target.value })}
+          className="w-full text-sm px-3 py-2 rounded-lg border"
+          style={selectStyle}
+          placeholder="שם הלקוח"
+        />
+      </div>
+      {!isEdit && (
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Slug *</label>
+          <input
+            type="text"
+            value={form.slug}
+            onChange={(e) => setForm({ ...form, slug: e.target.value })}
+            className="w-full text-sm px-3 py-2 rounded-lg border"
+            dir="ltr"
+            style={selectStyle}
+            placeholder="client-slug"
+          />
+        </div>
+      )}
+
+      {/* Meta Account */}
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+          חשבון Meta
+          {fbLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
+        </label>
+        {fbAccounts.length > 0 ? (
+          <div className="relative">
+            <select
+              value={form.metaAccountId}
+              onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
+              className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
+              dir="ltr"
+              style={selectStyle}
+            >
+              <option value="">ללא חשבון Meta</option>
+              {fbAccounts.map((acc) => (
+                <option
+                  key={acc.id}
+                  value={acc.account_id}
+                  disabled={usedMetaIds.has(acc.account_id) && acc.account_id !== form.metaAccountId}
+                >
+                  {acc.name} ({acc.account_id}) {acc.currency}
+                  {usedMetaIds.has(acc.account_id) && acc.account_id !== form.metaAccountId ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={form.metaAccountId}
+            onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
+            className="w-full text-sm px-3 py-2 rounded-lg border"
+            dir="ltr"
+            style={selectStyle}
+            placeholder={fbLoading ? 'טוען חשבונות...' : 'act_123456789'}
+          />
+        )}
+      </div>
+
+      {/* Google Customer */}
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+          חשבון Google Ads
+          {googleLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
+        </label>
+        {googleAccounts.length > 0 ? (
+          <div className="relative">
+            <select
+              value={form.googleCustomerId}
+              onChange={(e) => {
+                setForm({
+                  ...form,
+                  googleCustomerId: e.target.value,
+                  googleMccId: e.target.value ? googleMccId : '',
+                });
+              }}
+              className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
+              dir="ltr"
+              style={selectStyle}
+            >
+              <option value="">ללא חשבון Google</option>
+              {googleAccounts.map((acc) => (
+                <option
+                  key={acc.id}
+                  value={acc.id}
+                  disabled={usedGoogleIds.has(acc.id) && acc.id !== form.googleCustomerId}
+                >
+                  {acc.name} ({acc.id}) {acc.currency}
+                  {usedGoogleIds.has(acc.id) && acc.id !== form.googleCustomerId ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+            <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
+          </div>
+        ) : (
+          <input
+            type="text"
+            value={form.googleCustomerId}
+            onChange={(e) => setForm({ ...form, googleCustomerId: e.target.value })}
+            className="w-full text-sm px-3 py-2 rounded-lg border"
+            dir="ltr"
+            style={selectStyle}
+            placeholder={googleLoading ? 'טוען חשבונות...' : '123-456-7890'}
+          />
+        )}
+      </div>
+
+      {/* Google MCC — only when no dropdown */}
+      {googleAccounts.length === 0 && (
+        <div>
+          <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google MCC ID</label>
+          <input
+            type="text"
+            value={form.googleMccId}
+            onChange={(e) => setForm({ ...form, googleMccId: e.target.value })}
+            className="w-full text-sm px-3 py-2 rounded-lg border"
+            dir="ltr"
+            style={selectStyle}
+            placeholder="123-456-7890"
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>GA4 Property ID</label>
+        <input
+          type="text"
+          value={form.ga4PropertyId}
+          onChange={(e) => setForm({ ...form, ga4PropertyId: e.target.value })}
+          className="w-full text-sm px-3 py-2 rounded-lg border"
+          dir="ltr"
+          style={selectStyle}
+          placeholder="123456789"
+        />
+      </div>
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       {/* Actions */}
       <div className="flex gap-2">
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            setEditingId(null);
+            setForm(emptyForm);
+          }}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
           style={{ background: 'var(--accent)', color: '#1a1a1a' }}
         >
@@ -116,161 +360,51 @@ export const ClientManager = () => {
       {/* Add Client Form */}
       {showForm && (
         <div className="glass-card rounded-xl p-5 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>שם לקוח *</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                style={selectStyle}
-                placeholder="שם הלקוח"
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Slug *</label>
-              <input
-                type="text"
-                value={form.slug}
-                onChange={(e) => setForm({ ...form, slug: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                dir="ltr"
-                style={selectStyle}
-                placeholder="client-slug"
-              />
-            </div>
-
-            {/* Meta Account — Dropdown */}
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
-                חשבון Meta
-                {fbLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
-              </label>
-              {fbAccounts.length > 0 ? (
-                <div className="relative">
-                  <select
-                    value={form.metaAccountId}
-                    onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
-                    className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
-                    dir="ltr"
-                    style={selectStyle}
-                  >
-                    <option value="">ללא חשבון Meta</option>
-                    {fbAccounts.map((acc) => (
-                      <option
-                        key={acc.id}
-                        value={acc.account_id}
-                        disabled={usedMetaIds.has(acc.account_id)}
-                      >
-                        {acc.name} ({acc.account_id}) {acc.currency}{usedMetaIds.has(acc.account_id) ? ' ✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  value={form.metaAccountId}
-                  onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
-                  className="w-full text-sm px-3 py-2 rounded-lg border"
-                  dir="ltr"
-                  style={selectStyle}
-                  placeholder={fbLoading ? 'טוען חשבונות...' : 'act_123456789'}
-                />
-              )}
-            </div>
-
-            {/* Google Customer — Dropdown */}
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
-                חשבון Google Ads
-                {googleLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
-              </label>
-              {googleAccounts.length > 0 ? (
-                <div className="relative">
-                  <select
-                    value={form.googleCustomerId}
-                    onChange={(e) => {
-                      setForm({
-                        ...form,
-                        googleCustomerId: e.target.value,
-                        googleMccId: e.target.value ? googleMccId : '',
-                      });
-                    }}
-                    className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
-                    dir="ltr"
-                    style={selectStyle}
-                  >
-                    <option value="">ללא חשבון Google</option>
-                    {googleAccounts.map((acc) => (
-                      <option
-                        key={acc.id}
-                        value={acc.id}
-                        disabled={usedGoogleIds.has(acc.id)}
-                      >
-                        {acc.name} ({acc.id}) {acc.currency}{usedGoogleIds.has(acc.id) ? ' ✓' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
-                </div>
-              ) : (
-                <input
-                  type="text"
-                  value={form.googleCustomerId}
-                  onChange={(e) => setForm({ ...form, googleCustomerId: e.target.value })}
-                  className="w-full text-sm px-3 py-2 rounded-lg border"
-                  dir="ltr"
-                  style={selectStyle}
-                  placeholder={googleLoading ? 'טוען חשבונות...' : '123-456-7890'}
-                />
-              )}
-            </div>
-
-            {/* Google MCC — only show if no dropdown or manual entry */}
-            {googleAccounts.length === 0 && (
-              <div>
-                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google MCC ID</label>
-                <input
-                  type="text"
-                  value={form.googleMccId}
-                  onChange={(e) => setForm({ ...form, googleMccId: e.target.value })}
-                  className="w-full text-sm px-3 py-2 rounded-lg border"
-                  dir="ltr"
-                  style={selectStyle}
-                  placeholder="123-456-7890"
-                />
-              </div>
-            )}
-
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>GA4 Property ID</label>
-              <input
-                type="text"
-                value={form.ga4PropertyId}
-                onChange={(e) => setForm({ ...form, ga4PropertyId: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                dir="ltr"
-                style={selectStyle}
-                placeholder="123456789"
-              />
-            </div>
-          </div>
+          <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>לקוח חדש</h4>
+          {renderAccountFields(false)}
           <div className="flex gap-2">
             <button
               onClick={handleAdd}
-              className="px-4 py-2 text-sm font-medium rounded-lg"
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg"
               style={{ background: 'var(--accent)', color: '#1a1a1a' }}
             >
+              <Check size={14} />
               שמור
             </button>
             <button
-              onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-sm font-medium rounded-lg border"
+              onClick={() => { setShowForm(false); setForm(emptyForm); }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border"
               style={{ borderColor: 'var(--glass-border)', color: 'var(--text-secondary)' }}
             >
+              <X size={14} />
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Client Form */}
+      {editingId && (
+        <div className="glass-card rounded-xl p-5 space-y-4" style={{ borderColor: 'var(--accent)', borderWidth: '1px' }}>
+          <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            עריכת לקוח: {form.name}
+          </h4>
+          {renderAccountFields(true)}
+          <div className="flex gap-2">
+            <button
+              onClick={handleSaveEdit}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg"
+              style={{ background: 'var(--accent)', color: '#1a1a1a' }}
+            >
+              <Check size={14} />
+              שמור שינויים
+            </button>
+            <button
+              onClick={cancelEdit}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border"
+              style={{ borderColor: 'var(--glass-border)', color: 'var(--text-secondary)' }}
+            >
+              <X size={14} />
               ביטול
             </button>
           </div>
@@ -287,16 +421,21 @@ export const ClientManager = () => {
                 <th className="text-right py-2.5 px-4 font-medium hidden md:table-cell" style={{ color: 'var(--text-tertiary)' }}>Meta</th>
                 <th className="text-right py-2.5 px-4 font-medium hidden md:table-cell" style={{ color: 'var(--text-tertiary)' }}>Google</th>
                 <th className="text-right py-2.5 px-4 font-medium hidden md:table-cell" style={{ color: 'var(--text-tertiary)' }}>GA4</th>
+                <th className="text-right py-2.5 px-4 font-medium w-24" style={{ color: 'var(--text-tertiary)' }}>פעולות</th>
               </tr>
             </thead>
             <tbody>
               {clients.map((c: Record<string, unknown>) => {
+                const clientId = c.id as number;
                 const metaName = fbAccounts.find((a) => a.account_id === c.meta_account_id)?.name;
                 const googleName = googleAccounts.find((a) => a.id === c.google_customer_id)?.name;
+                const isDeleting = deletingId === clientId;
+
                 return (
-                  <tr key={c.id as number} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                  <tr key={clientId} style={{ borderBottom: '1px solid var(--glass-border)' }}>
                     <td className="py-2.5 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>
                       {c.name as string}
+                      <span className="block text-xs font-mono opacity-50" dir="ltr">{c.slug as string}</span>
                     </td>
                     <td className="py-2.5 px-4 hidden md:table-cell text-xs" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
                       {metaName ? (
@@ -315,11 +454,58 @@ export const ClientManager = () => {
                     <td className="py-2.5 px-4 hidden md:table-cell text-xs font-mono" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
                       {(c.ga4_property_id as string) || '—'}
                     </td>
+                    <td className="py-2.5 px-4">
+                      {isDeleting ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDelete(clientId)}
+                            className="p-1.5 rounded-md transition-colors"
+                            style={{ background: '#c0392b', color: '#fff' }}
+                            title="אישור מחיקה"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(null)}
+                            className="p-1.5 rounded-md border transition-colors"
+                            style={{ borderColor: 'var(--glass-border)', color: 'var(--text-secondary)' }}
+                            title="ביטול"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleEdit(c)}
+                            className="p-1.5 rounded-md transition-colors hover:opacity-80"
+                            style={{ color: 'var(--text-secondary)' }}
+                            title="עריכה"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(clientId)}
+                            className="p-1.5 rounded-md transition-colors hover:opacity-80"
+                            style={{ color: '#c0392b' }}
+                            title="מחיקה"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {clients.length === 0 && !showForm && (
+        <div className="glass-card rounded-xl p-8 text-center" style={{ color: 'var(--text-tertiary)' }}>
+          <p className="text-sm">אין לקוחות עדיין. לחץ על &quot;הוסף לקוח&quot; כדי להתחיל.</p>
         </div>
       )}
     </div>

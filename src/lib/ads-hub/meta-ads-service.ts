@@ -27,8 +27,11 @@ interface MetaAdCreative {
   campaign_id: string;
   creative?: {
     id: string;
-    video_id?: string;
     thumbnail_url?: string;
+    object_story_spec?: {
+      video_data?: { video_id?: string };
+      [key: string]: unknown;
+    };
   };
 }
 
@@ -67,6 +70,11 @@ function extractConversions(actions?: Array<{ action_type: string; value: string
   return total;
 }
 
+function ensureActPrefix(accountId: string): string {
+  const cleaned = accountId.replace(/\s|-/g, '');
+  return cleaned.startsWith('act_') ? cleaned : `act_${cleaned}`;
+}
+
 export async function syncDailyMetrics(
   clientId: number,
   accountId: string,
@@ -76,10 +84,11 @@ export async function syncDailyMetrics(
 ): Promise<SyncResult> {
   const started = new Date().toISOString();
   const db = getTurso();
+  const actId = ensureActPrefix(accountId);
 
   try {
     const fields = 'campaign_id,campaign_name,impressions,clicks,spend,cpc,ctr,actions';
-    const path = `/${accountId}/insights?fields=${fields}&level=campaign&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500`;
+    const path = `/${actId}/insights?fields=${fields}&level=campaign&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500`;
 
     const response = await fbFetch<MetaInsightsResponse>(path, accessToken);
     const rows = response.data || [];
@@ -163,15 +172,18 @@ export async function discoverVideoAds(
   const started = new Date().toISOString();
   const db = getTurso();
 
+  const actId = ensureActPrefix(accountId);
+
   try {
-    const fields = 'id,name,campaign_id,creative{id,video_id,thumbnail_url}';
-    const path = `/${accountId}/ads?fields=${fields}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=500`;
+    const fields = 'id,name,campaign_id,creative{id,thumbnail_url,object_story_spec}';
+    const path = `/${actId}/ads?fields=${fields}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=500`;
 
     const ads = await fbFetchAll<MetaAdCreative>(path, accessToken, 10);
     let recordsSynced = 0;
 
     for (const ad of ads) {
-      if (!ad.creative?.video_id) continue;
+      const videoId = ad.creative?.object_story_spec?.video_data?.video_id;
+      if (!videoId) continue;
 
       const utm = generateUtm(ad.campaign_id || 'unknown', ad.name || ad.id);
 
@@ -183,8 +195,8 @@ export async function discoverVideoAds(
           ad.id,
           ad.campaign_id || null,
           ad.name || null,
-          ad.creative.video_id,
-          ad.creative.thumbnail_url || null,
+          videoId,
+          ad.creative?.thumbnail_url || null,
           utm.utm_source,
           utm.utm_medium,
           utm.utm_campaign,

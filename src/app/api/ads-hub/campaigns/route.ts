@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const db = getTurso();
 
   const conditions = ['c.client_id = ?'];
-  const args: (string | number)[] = [clientId];
+  const args: (string | number)[] = [Number(clientId)];
 
   if (platform) {
     conditions.push('c.platform = ?');

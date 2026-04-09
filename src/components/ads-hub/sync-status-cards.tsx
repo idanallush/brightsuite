@@ -69,8 +69,12 @@ export const SyncStatusCards = ({ platforms, loading }: SyncStatusCardsProps) =>
           </div>
 
           {p.lastError && (
-            <p className="text-xs truncate" style={{ color: '#c0392b' }} title={p.lastError}>
-              {p.lastError}
+            <p
+              className="text-xs mt-1 px-2 py-1 rounded"
+              style={{ color: '#c0392b', background: '#fceaea', cursor: 'help' }}
+              title={p.lastError}
+            >
+              {p.lastError.length > 80 ? p.lastError.slice(0, 80) + '…' : p.lastError}
             </p>
           )}
         </div>
