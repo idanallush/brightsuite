@@ -85,7 +85,7 @@ const SidebarContent = ({
       <nav className="flex-1 p-2 flex flex-col gap-0.5 overflow-y-auto overflow-x-hidden">
         {accessibleTools.map((tool) => {
           const Icon = iconMap[tool.icon] || Shield;
-          const isActive = pathname.startsWith(tool.href);
+          const isActive = pathname === tool.href || pathname.startsWith(tool.href + '/');
           const smartHref = getLastRoute(tool.href) || tool.href;
 
           return (

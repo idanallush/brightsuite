@@ -4,8 +4,8 @@ import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 import { useLastRouteStore } from '@/stores/last-route';
 
-/** Tool base paths that we track */
-const TOOL_BASES = ['/ads', '/budget', '/cpa', '/writer', '/settings'];
+/** Tool base paths that we track — longer paths first to avoid prefix collisions */
+const TOOL_BASES = ['/ads-hub', '/ad-checker', '/ads', '/budget', '/cpa', '/writer', '/settings'];
 
 /**
  * Tracks the current route and saves it as the "last visited" route for the tool.
@@ -16,7 +16,7 @@ export function useRouteMemory() {
   const setLastRoute = useLastRouteStore((s) => s.setLastRoute);
 
   useEffect(() => {
-    const toolBase = TOOL_BASES.find((base) => pathname.startsWith(base));
+    const toolBase = TOOL_BASES.find((base) => pathname === base || pathname.startsWith(base + '/'));
     if (toolBase) {
       setLastRoute(toolBase, pathname);
     }
