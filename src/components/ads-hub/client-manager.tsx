@@ -1,8 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
+import { Plus, RefreshCw, ChevronDown, Loader2 } from 'lucide-react';
 import { useOverview } from '@/hooks/ads-hub/use-overview';
+import { useFacebookAccounts } from '@/hooks/ads/use-facebook-accounts';
+import { useGoogleAccounts } from '@/hooks/ads-hub/use-google-accounts';
 import { toast } from 'sonner';
 import { useDashboardStore } from '@/stores/ads-hub/dashboard-store';
 
@@ -10,6 +12,9 @@ export const ClientManager = () => {
   const { startDate, endDate } = useDashboardStore();
   const { data, mutate } = useOverview(startDate, endDate);
   const clients = data?.clients || [];
+
+  const { accounts: fbAccounts, isLoading: fbLoading } = useFacebookAccounts();
+  const { accounts: googleAccounts, mccId: googleMccId, isLoading: googleLoading } = useGoogleAccounts();
 
   const [showForm, setShowForm] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -67,6 +72,20 @@ export const ClientManager = () => {
     }
   };
 
+  const selectStyle = {
+    background: 'var(--glass-bg)',
+    borderColor: 'var(--glass-border)',
+    color: 'var(--text-primary)',
+  };
+
+  // Find which FB/Google accounts are already assigned to existing clients
+  const usedMetaIds = new Set(
+    clients.map((c: Record<string, unknown>) => c.meta_account_id as string).filter(Boolean)
+  );
+  const usedGoogleIds = new Set(
+    clients.map((c: Record<string, unknown>) => c.google_customer_id as string).filter(Boolean)
+  );
+
   return (
     <div className="space-y-4">
       {/* Actions */}
@@ -105,7 +124,7 @@ export const ClientManager = () => {
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 className="w-full text-sm px-3 py-2 rounded-lg border"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
+                style={selectStyle}
                 placeholder="שם הלקוח"
               />
             </div>
@@ -117,46 +136,115 @@ export const ClientManager = () => {
                 onChange={(e) => setForm({ ...form, slug: e.target.value })}
                 className="w-full text-sm px-3 py-2 rounded-lg border"
                 dir="ltr"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
+                style={selectStyle}
                 placeholder="client-slug"
               />
             </div>
+
+            {/* Meta Account — Dropdown */}
             <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Meta Account ID</label>
-              <input
-                type="text"
-                value={form.metaAccountId}
-                onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                dir="ltr"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
-                placeholder="act_123456789"
-              />
+              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                חשבון Meta
+                {fbLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
+              </label>
+              {fbAccounts.length > 0 ? (
+                <div className="relative">
+                  <select
+                    value={form.metaAccountId}
+                    onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
+                    className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
+                    dir="ltr"
+                    style={selectStyle}
+                  >
+                    <option value="">ללא חשבון Meta</option>
+                    {fbAccounts.map((acc) => (
+                      <option
+                        key={acc.id}
+                        value={acc.account_id}
+                        disabled={usedMetaIds.has(acc.account_id)}
+                      >
+                        {acc.name} ({acc.account_id}) {acc.currency}{usedMetaIds.has(acc.account_id) ? ' ✓' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={form.metaAccountId}
+                  onChange={(e) => setForm({ ...form, metaAccountId: e.target.value })}
+                  className="w-full text-sm px-3 py-2 rounded-lg border"
+                  dir="ltr"
+                  style={selectStyle}
+                  placeholder={fbLoading ? 'טוען חשבונות...' : 'act_123456789'}
+                />
+              )}
             </div>
+
+            {/* Google Customer — Dropdown */}
             <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google Customer ID</label>
-              <input
-                type="text"
-                value={form.googleCustomerId}
-                onChange={(e) => setForm({ ...form, googleCustomerId: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                dir="ltr"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
-                placeholder="123-456-7890"
-              />
+              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
+                חשבון Google Ads
+                {googleLoading && <Loader2 size={12} className="inline-block mr-1 animate-spin" />}
+              </label>
+              {googleAccounts.length > 0 ? (
+                <div className="relative">
+                  <select
+                    value={form.googleCustomerId}
+                    onChange={(e) => {
+                      setForm({
+                        ...form,
+                        googleCustomerId: e.target.value,
+                        googleMccId: e.target.value ? googleMccId : '',
+                      });
+                    }}
+                    className="w-full text-sm px-3 py-2 rounded-lg border appearance-none"
+                    dir="ltr"
+                    style={selectStyle}
+                  >
+                    <option value="">ללא חשבון Google</option>
+                    {googleAccounts.map((acc) => (
+                      <option
+                        key={acc.id}
+                        value={acc.id}
+                        disabled={usedGoogleIds.has(acc.id)}
+                      >
+                        {acc.name} ({acc.id}) {acc.currency}{usedGoogleIds.has(acc.id) ? ' ✓' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-tertiary)' }} />
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={form.googleCustomerId}
+                  onChange={(e) => setForm({ ...form, googleCustomerId: e.target.value })}
+                  className="w-full text-sm px-3 py-2 rounded-lg border"
+                  dir="ltr"
+                  style={selectStyle}
+                  placeholder={googleLoading ? 'טוען חשבונות...' : '123-456-7890'}
+                />
+              )}
             </div>
-            <div>
-              <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google MCC ID</label>
-              <input
-                type="text"
-                value={form.googleMccId}
-                onChange={(e) => setForm({ ...form, googleMccId: e.target.value })}
-                className="w-full text-sm px-3 py-2 rounded-lg border"
-                dir="ltr"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
-                placeholder="123-456-7890"
-              />
-            </div>
+
+            {/* Google MCC — only show if no dropdown or manual entry */}
+            {googleAccounts.length === 0 && (
+              <div>
+                <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google MCC ID</label>
+                <input
+                  type="text"
+                  value={form.googleMccId}
+                  onChange={(e) => setForm({ ...form, googleMccId: e.target.value })}
+                  className="w-full text-sm px-3 py-2 rounded-lg border"
+                  dir="ltr"
+                  style={selectStyle}
+                  placeholder="123-456-7890"
+                />
+              </div>
+            )}
+
             <div>
               <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>GA4 Property ID</label>
               <input
@@ -165,7 +253,7 @@ export const ClientManager = () => {
                 onChange={(e) => setForm({ ...form, ga4PropertyId: e.target.value })}
                 className="w-full text-sm px-3 py-2 rounded-lg border"
                 dir="ltr"
-                style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
+                style={selectStyle}
                 placeholder="123456789"
               />
             </div>
@@ -202,22 +290,34 @@ export const ClientManager = () => {
               </tr>
             </thead>
             <tbody>
-              {clients.map((c: Record<string, unknown>) => (
-                <tr key={c.id as number} style={{ borderBottom: '1px solid var(--glass-border)' }}>
-                  <td className="py-2.5 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {c.name as string}
-                  </td>
-                  <td className="py-2.5 px-4 hidden md:table-cell text-xs font-mono" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
-                    {(c.meta_account_id as string) || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 hidden md:table-cell text-xs font-mono" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
-                    {(c.google_customer_id as string) || '—'}
-                  </td>
-                  <td className="py-2.5 px-4 hidden md:table-cell text-xs font-mono" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
-                    {(c.ga4_property_id as string) || '—'}
-                  </td>
-                </tr>
-              ))}
+              {clients.map((c: Record<string, unknown>) => {
+                const metaName = fbAccounts.find((a) => a.account_id === c.meta_account_id)?.name;
+                const googleName = googleAccounts.find((a) => a.id === c.google_customer_id)?.name;
+                return (
+                  <tr key={c.id as number} style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    <td className="py-2.5 px-4 font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {c.name as string}
+                    </td>
+                    <td className="py-2.5 px-4 hidden md:table-cell text-xs" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
+                      {metaName ? (
+                        <span>{metaName} <span className="font-mono opacity-60">({c.meta_account_id as string})</span></span>
+                      ) : (
+                        <span className="font-mono">{(c.meta_account_id as string) || '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-4 hidden md:table-cell text-xs" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
+                      {googleName ? (
+                        <span>{googleName} <span className="font-mono opacity-60">({c.google_customer_id as string})</span></span>
+                      ) : (
+                        <span className="font-mono">{(c.google_customer_id as string) || '—'}</span>
+                      )}
+                    </td>
+                    <td className="py-2.5 px-4 hidden md:table-cell text-xs font-mono" dir="ltr" style={{ color: 'var(--text-secondary)' }}>
+                      {(c.ga4_property_id as string) || '—'}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
