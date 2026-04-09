@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { ensureDatabase } from '@/lib/db/turso';
 import { runDailySync } from '@/lib/ads-hub/sync-orchestrator';
 
 // POST /api/cron/ad-sync — nightly sync triggered by Vercel cron
@@ -9,6 +10,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    await ensureDatabase();
     const result = await runDailySync();
     return NextResponse.json({
       success: true,

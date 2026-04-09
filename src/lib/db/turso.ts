@@ -2,6 +2,7 @@ import { createClient, type Client } from '@libsql/client';
 import { join } from 'path';
 
 let _client: Client | null = null;
+let _initialized = false;
 
 export function getTurso(): Client {
   if (!_client) {
@@ -19,4 +20,11 @@ export function getTurso(): Client {
     }
   }
   return _client;
+}
+
+export async function ensureDatabase(): Promise<void> {
+  if (_initialized) return;
+  const { initDatabase } = await import('./init');
+  await initDatabase();
+  _initialized = true;
 }
