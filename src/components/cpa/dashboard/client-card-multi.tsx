@@ -1,18 +1,23 @@
 "use client";
 
+import useSWR from "swr";
 import { ChevronDown, EyeOff } from "lucide-react";
-import type { ClientCardData, CpaStatus, TopicMetrics } from "@/lib/cpa/types/dashboard";
+import type { ClientCardData, CpaStatus, TopicMetrics, SparklineData } from "@/lib/cpa/types/dashboard";
 import { Card, CardContent } from "@/components/cpa/ui/card";
 import { CpaBadge } from "@/components/cpa/dashboard/cpa-badge";
 import { CampaignManageDialog } from "@/components/cpa/dashboard/campaign-manage-dialog";
+import { Sparkline } from "@/components/cpa/dashboard/sparkline";
 import { formatMetricValue, formatCurrency } from "@/lib/cpa/format";
 import { METRIC_PRESETS, type MetricType } from "@/lib/cpa/metric-presets";
+import { useDashboardStore } from "@/stores/cpa/dashboard-store";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/cpa/ui/tooltip";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface ClientCardMultiProps {
   data: ClientCardData;
@@ -99,7 +104,6 @@ function TopicTypeTable({
   const totalConversions = topics.reduce((s, t) => s + t.conversions, 0);
   const avgCpa = totalConversions > 0 ? totalSpend / totalConversions : null;
 
-  // Build summary values for each column
   function getSummaryValue(col: TableColumn): string {
     if (col.key === "spend") return formatCurrency(totalSpend, currency);
     if (col.key === "leads" || col.key === "purchases" || col.key === "clicks")
@@ -120,20 +124,20 @@ function TopicTypeTable({
     }
     if (col.key === "roas") {
       const totalRev = topics.reduce((s, t) => s + (t.revenue || 0), 0);
-      return totalSpend > 0 ? formatMetricValue(totalRev / totalSpend, "decimal") : "—";
+      return totalSpend > 0 ? formatMetricValue(totalRev / totalSpend, "decimal") : "\u2014";
     }
     if (col.key === "ctr") {
       const totalClicks = topics.reduce((s, t) => s + (t.clicks || 0), 0);
       const totalImpressions = topics.reduce((s, t) => s + (t.impressions || 0), 0);
       return totalImpressions > 0
         ? formatMetricValue((totalClicks / totalImpressions) * 100, "percent")
-        : "—";
+        : "\u2014";
     }
     if (col.key === "cpm") {
       const totalImpressions = topics.reduce((s, t) => s + (t.impressions || 0), 0);
       return totalImpressions > 0
         ? formatMetricValue((totalSpend / totalImpressions) * 1000, "currency", currency)
-        : "—";
+        : "\u2014";
     }
     return "";
   }
@@ -145,62 +149,76 @@ function TopicTypeTable({
           <span className="text-xs font-bold text-[#1877F2]">{preset.label}</span>
         </div>
       )}
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="bg-[#F8F9FA] text-[11px] text-foreground uppercase tracking-wide border-b">
-            <th className="text-start px-3 py-2 font-bold">נושא</th>
-            {columns.map((col) => (
-              <th key={col.key} className="text-start px-3 py-2 font-bold">
-                {col.label}
-              </th>
-            ))}
-            <th className="text-start px-3 py-2 font-bold">יעד</th>
-            <th className="text-start px-3 py-2 font-bold">סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          {topics.map((topic, idx) => {
-            const overshootPercent =
-              topic.cpa !== null && topic.tcpa !== null && topic.tcpa > 0
-                ? ((topic.cpa - topic.tcpa) / topic.tcpa) * 100
-                : undefined;
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs sm:text-sm">
+          <thead>
+            <tr className="bg-[#F8F9FA] text-[10px] sm:text-[11px] text-foreground uppercase tracking-wide border-b">
+              <th className="text-start px-2 sm:px-3 py-2 font-bold sticky start-0 bg-[#F8F9FA] z-10">נושא</th>
+              {columns.map((col) => (
+                <th key={col.key} className="text-start px-2 sm:px-3 py-2 font-bold whitespace-nowrap">
+                  {col.label}
+                </th>
+              ))}
+              <th className="text-start px-2 sm:px-3 py-2 font-bold whitespace-nowrap">יעד</th>
+              <th className="text-start px-2 sm:px-3 py-2 font-bold">סטטוס</th>
+            </tr>
+          </thead>
+          <tbody>
+            {topics.map((topic, idx) => {
+              const overshootPercent =
+                topic.cpa !== null && topic.tcpa !== null && topic.tcpa > 0
+                  ? ((topic.cpa - topic.tcpa) / topic.tcpa) * 100
+                  : undefined;
 
-            return (
-              <tr key={topic.topic_id} className={idx % 2 === 1 ? "bg-[#FAFBFC]" : ""}>
-                <td className="px-3 py-2 font-medium">{topic.topic_name}</td>
-                {columns.map((col) => (
-                  <td key={col.key} className="px-3 py-2 tabular-nums">
-                    {formatMetricValue(getMetricValue(topic, col.key), col.format, currency)}
+              const rowBg = idx % 2 === 1 ? "bg-[#FAFBFC]" : "bg-white";
+
+              return (
+                <tr key={topic.topic_id} className={rowBg}>
+                  <td className={`px-2 sm:px-3 py-2 font-medium sticky start-0 ${rowBg} z-10`}>{topic.topic_name}</td>
+                  {columns.map((col) => (
+                    <td key={col.key} className="px-2 sm:px-3 py-2 tabular-nums whitespace-nowrap">
+                      {formatMetricValue(getMetricValue(topic, col.key), col.format, currency)}
+                    </td>
+                  ))}
+                  <td className="px-2 sm:px-3 py-2 tabular-nums text-muted-foreground whitespace-nowrap">
+                    {formatMetricValue(topic.tcpa, "currency", topic.tcpa_currency ?? currency)}
                   </td>
-                ))}
-                <td className="px-3 py-2 tabular-nums text-muted-foreground">
-                  {formatMetricValue(topic.tcpa, "currency", topic.tcpa_currency ?? currency)}
+                  <td className="px-2 sm:px-3 py-2">
+                    <CpaBadge status={topic.status} overshootPercent={overshootPercent} />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t bg-[#F8F9FA] font-bold text-[10px] sm:text-xs">
+              <td className="px-2 sm:px-3 py-2 sticky start-0 bg-[#F8F9FA] z-10">סה״כ</td>
+              {columns.map((col) => (
+                <td key={col.key} className="px-2 sm:px-3 py-2 tabular-nums whitespace-nowrap">
+                  {getSummaryValue(col)}
                 </td>
-                <td className="px-3 py-2">
-                  <CpaBadge status={topic.status} overshootPercent={overshootPercent} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-        <tfoot>
-          <tr className="border-t bg-[#F8F9FA] font-bold text-xs">
-            <td className="px-3 py-2">סה״כ</td>
-            {columns.map((col) => (
-              <td key={col.key} className="px-3 py-2 tabular-nums">
-                {getSummaryValue(col)}
-              </td>
-            ))}
-            <td colSpan={2} />
-          </tr>
-        </tfoot>
-      </table>
+              ))}
+              <td colSpan={2} />
+            </tr>
+          </tfoot>
+        </table>
+      </div>
     </div>
   );
 }
 
 export function ClientCardMulti({ data, isCollapsed, onToggleCollapse, onHide }: ClientCardMultiProps) {
   const status = deriveOverallStatus(data);
+  const { dateRange } = useDashboardStore();
+
+  const { data: sparklineList } = useSWR<SparklineData[]>(
+    `/api/cpa/dashboard/sparkline?since=${dateRange.since}&until=${dateRange.until}`,
+    fetcher,
+    { dedupingInterval: 600000 }
+  );
+
+  const sparklineData = sparklineList?.find((s) => s.client_id === data.client_id);
+  const overallTcpa = data.topics.find((t) => t.tcpa !== null)?.tcpa ?? null;
 
   // Group topics by metric_type
   const topicsByType = new Map<MetricType, TopicMetrics[]>();
@@ -225,11 +243,11 @@ export function ClientCardMulti({ data, isCollapsed, onToggleCollapse, onHide }:
 
       {/* Clickable header */}
       <div
-        className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 cursor-pointer select-none"
+        className="flex items-center justify-between gap-3 px-3 sm:px-5 pt-4 pb-3 cursor-pointer select-none"
         onClick={onToggleCollapse}
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-base font-bold leading-tight truncate">{data.client_name}</h3>
+          <h3 className="text-sm sm:text-base font-bold leading-tight truncate">{data.client_name}</h3>
           <div onClick={(e) => e.stopPropagation()}>
             <CampaignManageDialog data={data} />
           </div>
@@ -273,7 +291,7 @@ export function ClientCardMulti({ data, isCollapsed, onToggleCollapse, onHide }:
         }`}
       >
         <div className="overflow-hidden">
-          <CardContent className="px-5 pb-5 pt-0 space-y-4">
+          <CardContent className="px-3 sm:px-5 pb-4 sm:pb-5 pt-0 space-y-4">
             {/* Topics table(s) */}
             <div className="rounded-lg border overflow-hidden">
               {typeGroups.map(([metricType, topics]) => (
@@ -286,6 +304,14 @@ export function ClientCardMulti({ data, isCollapsed, onToggleCollapse, onHide }:
                 />
               ))}
             </div>
+
+            {/* Overall sparkline trend */}
+            {sparklineData && sparklineData.daily.length >= 2 && (
+              <Sparkline
+                data={sparklineData.daily}
+                tcpa={overallTcpa}
+              />
+            )}
           </CardContent>
         </div>
       </div>

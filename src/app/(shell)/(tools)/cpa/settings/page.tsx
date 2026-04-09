@@ -1,17 +1,53 @@
 "use client";
 
+import { useState, useEffect, useRef } from "react";
+import useSWR from "swr";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/cpa/ui/tabs";
 import { Card } from "@/components/cpa/ui/card";
+import { Button } from "@/components/cpa/ui/button";
 import { Skeleton } from "@/components/cpa/ui/skeleton";
 import { FbConnectionTab } from "@/components/cpa/settings/fb-connection-tab";
 import { ClientsTab } from "@/components/cpa/settings/clients-tab";
 import { TopicsTab } from "@/components/cpa/settings/topics-tab";
 import { AlertsTab } from "@/components/cpa/settings/alerts-tab";
 import { UsersTab } from "@/components/cpa/settings/users-tab";
+import { HealthBanner } from "@/components/cpa/settings/health-banner";
+import { SetupWizard } from "@/components/cpa/settings/setup-wizard";
 import { useAuth } from "@/hooks/use-auth";
+import { Wand2 } from "lucide-react";
+
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("Fetch failed");
+  return res.json();
+};
 
 export default function CpaSettingsPage() {
   const { loading, hasToolAccess } = useAuth();
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState("fb-connection");
+  const autoOpenChecked = useRef(false);
+
+  // Fetch health to determine auto-open
+  const { data: healthData } = useSWR(
+    !loading ? "/api/cpa/health" : null,
+    fetcher,
+    { revalidateOnFocus: false }
+  );
+
+  // Auto-open wizard if no active clients
+  useEffect(() => {
+    if (healthData && !autoOpenChecked.current) {
+      autoOpenChecked.current = true;
+      if (healthData.active_clients_count === 0) {
+        setWizardOpen(true);
+      }
+    }
+  }, [healthData]);
+
+  function handleNavigateTab(tab: string) {
+    setActiveTab(tab);
+  }
 
   if (loading) {
     return (
@@ -34,7 +70,21 @@ export default function CpaSettingsPage() {
 
   return (
     <div className="w-full space-y-6">
-      <Tabs defaultValue="fb-connection" dir="rtl">
+      <div className="flex items-center justify-between">
+        <div />
+        <Button
+          variant="outline"
+          onClick={() => setWizardOpen(true)}
+          className="gap-1.5 text-sm"
+        >
+          <Wand2 className="h-4 w-4" />
+          אשף הגדרה
+        </Button>
+      </div>
+
+      <HealthBanner onNavigateTab={handleNavigateTab} />
+
+      <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
         <TabsList className="w-full bg-card border rounded-xl p-1.5 h-auto flex-wrap gap-0">
           <TabsTrigger value="fb-connection" className="rounded-none px-4 py-2 text-[13px] font-medium">
             חיבור פייסבוק
@@ -69,6 +119,8 @@ export default function CpaSettingsPage() {
           <UsersTab />
         </TabsContent>
       </Tabs>
+
+      <SetupWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </div>
   );
 }
