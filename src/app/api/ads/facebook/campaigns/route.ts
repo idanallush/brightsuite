@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/session";
-import { fbFetchAll } from "@/lib/facebook/client";
-import { FacebookApiError } from "@/lib/facebook/client";
+import { fbFetchAll, FacebookApiError } from "@/lib/facebook/client";
+import { getFbToken } from "@/lib/facebook/connection";
 
 interface FBCampaignInsightRow {
   campaign_id: string;
@@ -112,7 +112,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!session.fbAccessToken) {
+  // Try DB first, fall back to session
+  const accessToken = (session.userId ? await getFbToken(session.userId) : null) ?? session.fbAccessToken;
+
+  if (!accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -129,7 +132,7 @@ export async function GET(request: NextRequest) {
       `&filtering=${filtering}` +
       `&limit=100`;
 
-    const rows = await fbFetchAll<FBCampaignInsightRow>(path, session.fbAccessToken, 20);
+    const rows = await fbFetchAll<FBCampaignInsightRow>(path, accessToken, 20);
     const campaigns = rows.map(parseCampaignRow);
 
     // Sort by spend descending

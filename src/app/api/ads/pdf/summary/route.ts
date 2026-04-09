@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "@/lib/auth/session";
+import { requireApiAuth } from "@/lib/auth/require-auth-api";
 import { generateSummaryPdf, generateGroupedSummaryPdf } from "@/lib/ads/pdf/generator";
 import type { AdCreativeRow } from "@/lib/ads/types/ad";
 import { randomUUID } from "crypto";
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
 
   try {
     const body = await request.json();
@@ -62,6 +60,7 @@ export async function POST(request: NextRequest) {
           adCount,
           createdAt: new Date().toISOString(),
           reportType: "summary",
+          createdByUserId: session.userId,
         },
         buffer
       );

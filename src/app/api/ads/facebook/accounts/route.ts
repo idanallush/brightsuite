@@ -2,16 +2,20 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/session";
 import { fetchAdAccounts } from "@/lib/ads/facebook-accounts";
 import { FacebookApiError } from "@/lib/facebook/client";
+import { getFbToken } from "@/lib/facebook/connection";
 
 export async function GET() {
   const session = await getServerSession();
 
-  if (!session.fbAccessToken) {
+  // Try DB first, fall back to session
+  const accessToken = (session.userId ? await getFbToken(session.userId) : null) ?? session.fbAccessToken;
+
+  if (!accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
   try {
-    const accounts = await fetchAdAccounts(session.fbAccessToken);
+    const accounts = await fetchAdAccounts(accessToken);
     return NextResponse.json({ accounts });
   } catch (err) {
     if (err instanceof FacebookApiError && err.isTokenExpired) {

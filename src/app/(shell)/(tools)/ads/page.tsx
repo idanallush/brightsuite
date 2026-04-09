@@ -1,37 +1,54 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { BarChart3, LayoutGrid, SlidersHorizontal, Download } from 'lucide-react';
+import { LayoutGrid, SlidersHorizontal, Download, Loader2 } from 'lucide-react';
 import { LoginButton } from '@/components/ads/auth/login-button';
 
 export default function AdsPage() {
-  const { user, tools, loading } = useAuth();
+  const { loading, hasToolAccess } = useAuth();
   const router = useRouter();
+  const [fbChecked, setFbChecked] = useState(false);
+  const [fbConnected, setFbConnected] = useState(false);
 
-  const hasAccess = !loading && tools.includes('ads');
+  const hasAccess = !loading && hasToolAccess('ads');
+
+  // Check FB connection — if connected, redirect straight to dashboard
+  useEffect(() => {
+    if (!hasAccess || fbChecked) return;
+
+    fetch('/api/ads/auth/status')
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.connected) {
+          setFbConnected(true);
+          router.replace('/ads/dashboard');
+        } else {
+          setFbChecked(true);
+        }
+      })
+      .catch(() => setFbChecked(true));
+  }, [hasAccess, fbChecked, router]);
 
   useEffect(() => {
     if (!loading && !hasAccess) {
-      router.replace('/');
+      router.replace('/dashboard');
     }
   }, [loading, hasAccess, router]);
 
-  if (loading) {
+  if (loading || (!fbChecked && !fbConnected)) {
     return (
       <div className="flex items-center justify-center py-24">
-        <div className="h-8 w-8 rounded-full border-[3px] border-zinc-200 animate-spin" style={{ borderTopColor: '#1877F2', borderRightColor: '#1877F2' }} />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: 'var(--accent-fg)' }} />
       </div>
     );
   }
 
-  if (!hasAccess) {
+  if (!hasAccess || fbConnected) {
     return null;
   }
 
-  // If user is authenticated, redirect to ads dashboard
-  // For now show the landing page with login
   return (
     <div className="flex flex-col items-center justify-center py-16 px-6">
       <div className="max-w-2xl text-center space-y-10">

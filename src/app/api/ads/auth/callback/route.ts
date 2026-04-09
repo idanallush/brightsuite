@@ -5,6 +5,7 @@ import {
   getLongLivedToken,
   getUserProfile,
 } from "@/lib/facebook/auth";
+import { saveFbConnection } from "@/lib/facebook/connection";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
@@ -16,18 +17,18 @@ export async function GET(request: NextRequest) {
 
   // Handle user denied permission
   if (error) {
-    return NextResponse.redirect(`${BASE_URL}?error=${error}`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=${error}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${BASE_URL}?error=no_code`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=no_code`);
   }
 
   const session = await getServerSession();
 
   // Validate CSRF state
   if (!state || state !== session.csrfState) {
-    return NextResponse.redirect(`${BASE_URL}?error=invalid_state`);
+    return NextResponse.redirect(`${BASE_URL}/ads?error=invalid_state`);
   }
 
   try {
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
       console.warn("Profile fetch failed, continuing with defaults:", profileErr);
     }
 
-    // Store in BrightSuite session
+    // Store in BrightSuite session (backward compat)
     session.fbAccessToken = longLived.access_token;
     session.fbTokenExpiry = Date.now() + longLived.expires_in * 1000;
     session.fbUserId = profileId;
@@ -56,11 +57,19 @@ export async function GET(request: NextRequest) {
     session.csrfState = undefined;
     await session.save();
 
-    return NextResponse.redirect(`${BASE_URL}/dashboard`);
+    // Save to DB — unified storage for all tools
+    await saveFbConnection(session.userId!, {
+      fbUserId: profileId,
+      fbUserName: profileName,
+      accessToken: longLived.access_token,
+      expiresIn: longLived.expires_in,
+    });
+
+    return NextResponse.redirect(`${BASE_URL}/ads/dashboard`);
   } catch (err) {
     console.error("OAuth callback error:", err);
     return NextResponse.redirect(
-      `${BASE_URL}?error=auth_failed&message=${encodeURIComponent(
+      `${BASE_URL}/ads?error=auth_failed&message=${encodeURIComponent(
         err instanceof Error ? err.message : "Unknown error"
       )}`
     );

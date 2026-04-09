@@ -4,6 +4,7 @@ import { fetchAds } from "@/lib/ads/facebook-ads";
 import { fetchInsightsBatch, parseInsights } from "@/lib/ads/facebook-insights";
 import { normalizeAds, resolveMediaUrls } from "@/lib/ads/facebook-creatives";
 import { FacebookApiError } from "@/lib/facebook/client";
+import { getFbToken } from "@/lib/facebook/connection";
 import type { FBInsights } from "@/lib/facebook/types";
 
 export async function GET(request: NextRequest) {
@@ -25,7 +26,10 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  if (!session.fbAccessToken) {
+  // Try DB first, fall back to session
+  const accessToken = (session.userId ? await getFbToken(session.userId) : null) ?? session.fbAccessToken;
+
+  if (!accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -34,7 +38,7 @@ export async function GET(request: NextRequest) {
     const effectiveStatuses = ["ACTIVE", "PAUSED", "CAMPAIGN_PAUSED", "ADSET_PAUSED"];
 
     // Fetch ads — if campaignId is set, fetch all ads for that campaign
-    const ads = await fetchAds(accountId, session.fbAccessToken, {
+    const ads = await fetchAds(accountId, accessToken, {
       effectiveStatuses,
       campaignId: campaignId || undefined,
     });
@@ -53,7 +57,7 @@ export async function GET(request: NextRequest) {
       insightsMap = await fetchInsightsBatch(
         adIds,
         { since, until },
-        session.fbAccessToken
+        accessToken
       );
     } catch (insightsErr) {
       console.error(`[Ads] fetchInsightsBatch failed for ${adIds.length} ads:`, insightsErr instanceof Error ? insightsErr.message : insightsErr);
@@ -99,7 +103,7 @@ export async function GET(request: NextRequest) {
     const filteredRawAds = ads.filter((raw) => activeAdIds.has(raw.id));
 
     // Resolve missing media URLs via story IDs + image hash resolution
-    normalizedAds = await resolveMediaUrls(normalizedAds, filteredRawAds, session.fbAccessToken, accountId);
+    normalizedAds = await resolveMediaUrls(normalizedAds, filteredRawAds, accessToken, accountId);
 
     return NextResponse.json({ ads: normalizedAds });
   } catch (err) {

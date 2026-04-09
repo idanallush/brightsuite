@@ -9,6 +9,8 @@ import OutputSettings from '@/components/writer/OutputSettings';
 import LoadingState from '@/components/writer/LoadingState';
 import { getClient, getClients, generateCopy, fetchUrl } from '@/lib/writer/api-client';
 import { useWriterToast as useToast } from '@/hooks/use-writer-toast';
+import { HelpTip } from '@/components/ui/help-tip';
+import { SyncIndicator } from '@/components/ui/sync-progress';
 
 const toneOptions = [
   { id: 'professional', label: 'מקצועי' },
@@ -207,7 +209,7 @@ export default function WriterGeneratePage() {
   return (
     <div className="max-w-3xl mx-auto p-6 space-y-4 animate-[fadeIn_0.25s_ease-out]">
       {/* Client Selector */}
-      <div ref={dropdownRef} className="relative">
+      <div ref={dropdownRef} className="relative flex items-center gap-2">
         <button
           onClick={() => setClientDropdownOpen(!clientDropdownOpen)}
           className="flex items-center gap-2.5 px-4 py-2.5 glass-card rounded-xl border border-white/[0.08] hover:border-[#1877F2]/40 transition-colors"
@@ -222,6 +224,7 @@ export default function WriterGeneratePage() {
           <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{currentClient?.name || 'בחר לקוח'}</span>
           <ChevronDown className={`w-3.5 h-3.5 transition-transform ${clientDropdownOpen ? 'rotate-180' : ''}`} style={{ color: 'var(--text-muted)' }} />
         </button>
+        <HelpTip text="בחר לקוח כדי לטעון את פרופיל המותג שלו. ניתן להוסיף לקוחות חדשים בלשונית 'לקוחות'." />
 
         {clientDropdownOpen && (
           <div className="absolute top-full start-0 mt-1 glass-card border border-white/[0.08] rounded-xl z-20 min-w-[200px] animate-[fadeIn_0.15s_ease-out]">
@@ -260,8 +263,9 @@ export default function WriterGeneratePage() {
       <div className="glass-card rounded-2xl border border-white/[0.08] p-5 space-y-4">
         {/* URL Input */}
         <div>
-          <label htmlFor="url-input" className="block text-[13px] font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <label htmlFor="url-input" className="flex items-center gap-1.5 text-[13px] font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
             URL של דף הנחיתה / אתר
+            <HelpTip text="הדבק כתובת דף נחיתה או אתר. המערכת תנתח את התוכן ותשתמש בו ליצירת הקופי." />
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -293,6 +297,7 @@ export default function WriterGeneratePage() {
               ) : null}
               {fetchSuccess ? 'התוכן נשלף בהצלחה' : 'Fetch'}
             </button>
+            {fetching && <SyncIndicator message="מנתח את התוכן..." />}
           </div>
         </div>
 
@@ -304,8 +309,8 @@ export default function WriterGeneratePage() {
               className="w-full flex items-center justify-between"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4" style={{ color: 'var(--accent)' }} />
-                <span className="text-[13px] font-semibold" style={{ color: 'var(--accent)' }}>בריף AI — {analyzedBrief.business_name || 'ניתוח אתר'}</span>
+                <Sparkles className="w-4 h-4" style={{ color: 'var(--accent-fg)' }} />
+                <span className="text-[13px] font-semibold" style={{ color: 'var(--accent-fg)' }}>בריף AI — {analyzedBrief.business_name || 'ניתוח אתר'}</span>
               </div>
               {showBriefDetails ? (
                 <ChevronUp className="w-4 h-4 text-[#1877F2]/70" />
@@ -362,7 +367,7 @@ export default function WriterGeneratePage() {
                 {analyzedBrief.key_phrases?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-1">
                     {analyzedBrief.key_phrases.map((phrase: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 bg-white/5 rounded-full text-[11px] border border-[#1877F2]/25" style={{ color: 'var(--accent)' }}>
+                      <span key={i} className="px-2 py-0.5 bg-white/5 rounded-full text-[11px] border border-[#1877F2]/25" style={{ color: 'var(--accent-fg)' }}>
                         {phrase}
                       </span>
                     ))}
@@ -375,8 +380,9 @@ export default function WriterGeneratePage() {
 
         {/* Additional Notes */}
         <div>
-          <label htmlFor="additional-notes" className="block text-[13px] font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
+          <label htmlFor="additional-notes" className="flex items-center gap-1.5 text-[13px] font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>
             הנחיות נוספות (אופציונלי)
+            <HelpTip text="הוסף הנחיות ספציפיות כמו קהל יעד, מבצע מיוחד, CTA רצוי, או טקסט שחובה לכלול." />
           </label>
           <textarea
             id="additional-notes"
@@ -391,8 +397,9 @@ export default function WriterGeneratePage() {
 
         {/* Tone of Voice */}
         <div>
-          <label className="block text-[13px] font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
+          <label className="flex items-center gap-1.5 text-[13px] font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
             טון דיבור
+            <HelpTip text="הטון משפיע על הסגנון של הקופי שייוצר. ניתן לדלג — ברירת מחדל היא מקצועי." />
           </label>
           <div className="flex flex-wrap gap-2">
             {toneOptions.map((tone) => (
@@ -453,15 +460,18 @@ export default function WriterGeneratePage() {
 
       {/* Generate button */}
       <div className="pt-2">
-        <button
-          onClick={handleGenerate}
-          disabled={activePlatforms.length === 0}
-          className="w-full flex items-center justify-center gap-2 text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
-          style={{ backgroundColor: 'var(--accent)' }}
-        >
-          <Zap className="w-5 h-5" />
-          <span>ייצור קופי</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleGenerate}
+            disabled={activePlatforms.length === 0}
+            className="flex-1 flex items-center justify-center gap-2 text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:opacity-90"
+            style={{ backgroundColor: 'var(--accent)' }}
+          >
+            <Zap className="w-5 h-5" />
+            <span>ייצור קופי</span>
+          </button>
+          <HelpTip text="הייצור לוקח 30-60 שניות. ניתן לערוך ולשנות את התוצאות אחרי." />
+        </div>
         <p className="text-center text-[12px] mt-2" style={{ color: 'var(--text-secondary)' }}>
           הייצור לוקח בין 30 ל-60 שניות | Ctrl+Enter לייצור מהיר
         </p>

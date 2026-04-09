@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth/session";
 import { fbBatch, FacebookApiError } from "@/lib/facebook/client";
+import { getFbToken } from "@/lib/facebook/connection";
 import type { FBBatchRequest, FBInsights } from "@/lib/facebook/types";
 import { parseInsights, type ParsedMetrics } from "@/lib/ads/facebook-insights";
 
@@ -48,7 +49,10 @@ export async function GET(request: NextRequest) {
   if (!since || !until) {
     return NextResponse.json({ error: "since and until are required" }, { status: 400 });
   }
-  if (!session.fbAccessToken) {
+  // Try DB first, fall back to session
+  const accessToken = (session.userId ? await getFbToken(session.userId) : null) ?? session.fbAccessToken;
+
+  if (!accessToken) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
@@ -67,7 +71,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // fbBatch handles chunking at 50
-    const responses = await fbBatch(requests, session.fbAccessToken);
+    const responses = await fbBatch(requests, accessToken);
 
     const insights: Record<string, ParsedMetrics> = {};
 

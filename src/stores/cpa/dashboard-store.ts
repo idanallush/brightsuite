@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import { subDays, format } from "date-fns";
 
 interface DateRange {
@@ -18,14 +19,25 @@ interface DashboardStore {
 const today = new Date();
 const sevenDaysAgo = subDays(today, 7);
 
-export const useDashboardStore = create<DashboardStore>((set) => ({
-  dateRange: {
-    since: format(sevenDaysAgo, "yyyy-MM-dd"),
-    until: format(today, "yyyy-MM-dd"),
-  },
-  setDateRange: (range) => set({ dateRange: range }),
-  isRefreshing: false,
-  setIsRefreshing: (val) => set({ isRefreshing: val }),
-  lastUpdated: null,
-  setLastUpdated: (val) => set({ lastUpdated: val }),
-}));
+export const useDashboardStore = create<DashboardStore>()(
+  persist(
+    (set) => ({
+      dateRange: {
+        since: format(sevenDaysAgo, "yyyy-MM-dd"),
+        until: format(today, "yyyy-MM-dd"),
+      },
+      setDateRange: (range) => set({ dateRange: range }),
+      isRefreshing: false,
+      setIsRefreshing: (val) => set({ isRefreshing: val }),
+      lastUpdated: null,
+      setLastUpdated: (val) => set({ lastUpdated: val }),
+    }),
+    {
+      name: "cpa-dashboard-store",
+      partialize: (state) => ({
+        dateRange: state.dateRange,
+        lastUpdated: state.lastUpdated,
+      }),
+    },
+  ),
+);

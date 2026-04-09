@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getTurso } from '@/lib/db/turso';
+import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
 const toNum = (v: unknown): number => typeof v === 'bigint' ? Number(v) : v as number;
 
-// GET /api/writer/clients — list all clients
+// GET /api/writer/clients — list all clients (shared data)
 export async function GET() {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   try {
     const db = getTurso();
     const result = await db.execute('SELECT * FROM clients ORDER BY created_at ASC');
@@ -14,8 +18,11 @@ export async function GET() {
   }
 }
 
-// POST /api/writer/clients — create client
+// POST /api/writer/clients — create client (shared data)
 export async function POST(request: NextRequest) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const { name, initial, color, about, website, logo, winning_ads, avoid_notes } = await request.json();
   if (!name || !initial) {
     return NextResponse.json({ error: 'name and initial are required' }, { status: 400 });

@@ -200,7 +200,7 @@ export default function WriterArchivePage() {
                   <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>{item.text}</p>
                   <div className="flex items-center gap-2 mt-2 flex-wrap">
                     {item.platform && (
-                      <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--accent-subtle)', color: 'var(--accent)' }}>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full font-medium" style={{ background: 'var(--accent-subtle)', color: 'var(--accent-fg)' }}>
                         {platformOptions.find((p) => p.value === item.platform)?.label || item.platform}
                       </span>
                     )}

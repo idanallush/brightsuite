@@ -1,12 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Eye, EyeOff, Filter, ChevronsDownUp, ChevronsUpDown, Bookmark, Trash2, Save } from "lucide-react";
-import type { ClientCardData } from "@/lib/cpa/types/dashboard";
+import { useState, useEffect, useMemo } from "react";
+import { Eye, EyeOff, Filter, ChevronsDownUp, ChevronsUpDown, Bookmark, Trash2, Save, LayoutGrid, TableProperties } from "lucide-react";
+import type { ClientCardData, CpaStatus } from "@/lib/cpa/types/dashboard";
 import { ClientCard } from "@/components/cpa/dashboard/client-card";
+import { TableView } from "@/components/cpa/dashboard/table-view";
 import { Button } from "@/components/cpa/ui/button";
 import { Checkbox } from "@/components/cpa/ui/checkbox";
 import { Input } from "@/components/cpa/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/cpa/ui/select";
 import {
   Popover,
   PopoverContent,
@@ -65,6 +73,55 @@ function setSavedViews(views: SavedView[]) {
   localStorage.setItem("cpa-saved-views", JSON.stringify(views));
 }
 
+type ViewMode = "grid" | "table";
+type SortOption = "default" | "status-red" | "status-green" | "spend-desc" | "spend-asc" | "cpa-desc" | "cpa-asc";
+
+function getViewMode(): ViewMode {
+  try {
+    const stored = localStorage.getItem("cpa-view-mode");
+    return stored === "table" ? "table" : "grid";
+  } catch {
+    return "grid";
+  }
+}
+
+const STATUS_ORDER: Record<CpaStatus, number> = {
+  red: 0,
+  yellow: 1,
+  green: 2,
+  no_data: 3,
+};
+
+function getWorstStatus(card: ClientCardData): CpaStatus {
+  if (card.topics.length === 0) return "no_data";
+  let worst: CpaStatus = "no_data";
+  for (const t of card.topics) {
+    if (STATUS_ORDER[t.status] < STATUS_ORDER[worst]) worst = t.status;
+  }
+  return worst;
+}
+
+function sortCards(cards: ClientCardData[], option: SortOption): ClientCardData[] {
+  if (option === "default") return cards;
+  const arr = [...cards];
+  switch (option) {
+    case "status-red":
+      return arr.sort((a, b) => STATUS_ORDER[getWorstStatus(a)] - STATUS_ORDER[getWorstStatus(b)]);
+    case "status-green":
+      return arr.sort((a, b) => STATUS_ORDER[getWorstStatus(b)] - STATUS_ORDER[getWorstStatus(a)]);
+    case "spend-desc":
+      return arr.sort((a, b) => b.total_spend - a.total_spend);
+    case "spend-asc":
+      return arr.sort((a, b) => a.total_spend - b.total_spend);
+    case "cpa-desc":
+      return arr.sort((a, b) => (b.overall_cpa ?? -1) - (a.overall_cpa ?? -1));
+    case "cpa-asc":
+      return arr.sort((a, b) => (a.overall_cpa ?? Infinity) - (b.overall_cpa ?? Infinity));
+    default:
+      return arr;
+  }
+}
+
 interface DashboardGridProps {
   cards: ClientCardData[];
 }
@@ -75,13 +132,21 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
   const [savedViews, setSavedViewsState] = useState<SavedView[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newViewName, setNewViewName] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("grid");
+  const [sortOption, setSortOption] = useState<SortOption>("default");
 
   // Load from localStorage on mount
   useEffect(() => {
     setHidden(getHiddenCards());
     setCollapsed(getCollapsedCards());
     setSavedViewsState(getSavedViews());
+    setViewMode(getViewMode());
   }, []);
+
+  function handleViewModeChange(mode: ViewMode) {
+    setViewMode(mode);
+    localStorage.setItem("cpa-view-mode", mode);
+  }
 
   function toggleCollapse(clientId: string) {
     setCollapsed((prev) => {
@@ -161,7 +226,8 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
     setSavedViews(updated);
   }
 
-  const visibleCards = cards.filter((c) => !hidden.has(c.client_id));
+  const visibleCards = useMemo(() => cards.filter((c) => !hidden.has(c.client_id)), [cards, hidden]);
+  const sortedVisibleCards = useMemo(() => sortCards(visibleCards, sortOption), [visibleCards, sortOption]);
   const hiddenCount = cards.length - visibleCards.length;
   const allCollapsed = visibleCards.length > 0 && visibleCards.every((c) => collapsed.has(c.client_id));
 
@@ -169,7 +235,7 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
     <div className="space-y-4">
       {/* Filter bar + collapse/expand + saved views */}
       {cards.length > 0 && (
-        <div className="flex flex-row-reverse flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           {/* Client filter popover */}
           <Popover>
             <PopoverTrigger asChild>
@@ -298,6 +364,42 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
             {allCollapsed ? "פתח הכל" : "כווץ הכל"}
           </Button>
 
+          {/* Sort dropdown - grid view only */}
+          {viewMode === "grid" && (
+            <Select value={sortOption} onValueChange={(v) => setSortOption(v as SortOption)}>
+              <SelectTrigger className="h-8 w-auto min-w-[160px] text-xs">
+                <SelectValue placeholder="מיון" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="default">ברירת מחדל</SelectItem>
+                <SelectItem value="status-red">סטטוס — אדום קודם</SelectItem>
+                <SelectItem value="status-green">סטטוס — ירוק קודם</SelectItem>
+                <SelectItem value="spend-desc">הוצאה — גבוה לנמוך</SelectItem>
+                <SelectItem value="spend-asc">הוצאה — נמוך לגבוה</SelectItem>
+                <SelectItem value="cpa-desc">CPA — גבוה לנמוך</SelectItem>
+                <SelectItem value="cpa-asc">CPA — נמוך לגבוה</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* View mode toggle */}
+          <div className="flex items-center border border-neutral-200 rounded-md overflow-hidden">
+            <button
+              className={`h-8 px-2 flex items-center justify-center transition-colors ${viewMode === "grid" ? "bg-neutral-100 text-neutral-900" : "text-neutral-400 hover:text-neutral-600"}`}
+              onClick={() => handleViewModeChange("grid")}
+              aria-label="תצוגת כרטיסים"
+            >
+              <LayoutGrid className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className={`h-8 px-2 flex items-center justify-center transition-colors ${viewMode === "table" ? "bg-neutral-100 text-neutral-900" : "text-neutral-400 hover:text-neutral-600"}`}
+              onClick={() => handleViewModeChange("table")}
+              aria-label="תצוגת טבלה"
+            >
+              <TableProperties className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
           <div className="flex-1" />
         </div>
       )}
@@ -320,18 +422,22 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
         </div>
       )}
 
-      {/* Cards grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {visibleCards.map((card) => (
-          <ClientCard
-            key={card.client_id}
-            data={card}
-            isCollapsed={collapsed.has(card.client_id)}
-            onToggleCollapse={() => toggleCollapse(card.client_id)}
-            onHide={() => hideCard(card.client_id)}
-          />
-        ))}
-      </div>
+      {/* Cards grid or table view */}
+      {viewMode === "table" ? (
+        <TableView cards={sortedVisibleCards} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {sortedVisibleCards.map((card) => (
+            <ClientCard
+              key={card.client_id}
+              data={card}
+              isCollapsed={collapsed.has(card.client_id)}
+              onToggleCollapse={() => toggleCollapse(card.client_id)}
+              onHide={() => hideCard(card.client_id)}
+            />
+          ))}
+        </div>
+      )}
 
       {/* Save view dialog */}
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>

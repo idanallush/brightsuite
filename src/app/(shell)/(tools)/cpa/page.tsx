@@ -11,6 +11,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useDashboardStore } from "@/stores/cpa/dashboard-store";
 import { DateRangePicker } from "@/components/cpa/dashboard/date-range-picker";
 import { DashboardGrid } from "@/components/cpa/dashboard/dashboard-grid";
+import { KpiSummary } from "@/components/cpa/dashboard/kpi-summary";
 import { Button } from "@/components/cpa/ui/button";
 import { Card } from "@/components/cpa/ui/card";
 import { Skeleton } from "@/components/cpa/ui/skeleton";
@@ -70,7 +71,7 @@ function DashboardContent() {
   );
 
   const { data, error, isLoading, mutate } = useSWR<ClientCardData[]>(
-    `/api/cpa/dashboard/cards?since=${dateRange.since}&until=${dateRange.until}`,
+    `/api/cpa/dashboard/cards?since=${dateRange.since}&until=${dateRange.until}&compare=true`,
     cardsFetcher,
     {
       revalidateOnFocus: false,
@@ -125,7 +126,7 @@ function DashboardContent() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-row-reverse flex-wrap gap-3 items-center">
+      <div className="flex flex-wrap gap-3 items-center">
         <DateRangePicker onDateRangeChange={handleDateRangeChange} />
         <div className="flex-1" />
         <Button
@@ -200,7 +201,10 @@ function DashboardContent() {
           </div>
         </Card>
       ) : (
-        <DashboardGrid cards={data} />
+        <>
+          <KpiSummary cards={data} />
+          <DashboardGrid cards={data} />
+        </>
       )}
     </div>
   );

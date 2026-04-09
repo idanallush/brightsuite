@@ -2,7 +2,7 @@
 
 /* =============================================
    BrightSuite — Glass Light Design System
-   Accent: Blue #2563eb
+   Accent: Yellow #FFDF4F
    ============================================= */
 
 :root {
@@ -34,12 +34,13 @@
   --text-disabled: #c5c0b8;
   --text-inverse: #ffffff;
 
-  /* Accent — Blue */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-subtle: rgba(37, 99, 235, 0.15);
-  --accent-ring: rgba(37, 99, 235, 0.30);
-  --accent-text: #ffffff;
+  /* Accent — Yellow */
+  --accent: #FFDF4F;
+  --accent-hover: #f5d43a;
+  --accent-subtle: rgba(255, 223, 79, 0.18);
+  --accent-ring: rgba(255, 223, 79, 0.35);
+  --accent-text: #1a1a1a;          /* text ON accent bg */
+  --accent-fg: #1a1a1a;            /* accent-colored text on light bg — must pass 4.5:1 */
 
   /* Semantic — Success */
   --success: #16a34a;
@@ -193,12 +194,17 @@ body {
   border: 1px solid var(--card-border);
   border-radius: var(--radius-md);
   box-shadow: var(--card-shadow);
-  transition: box-shadow var(--transition-base), border-color var(--transition-base);
+  transition: box-shadow var(--transition-base), border-color var(--transition-base), transform 200ms ease;
 }
 
 .glass-card:hover {
   box-shadow: var(--glass-shadow);
   border-color: var(--glass-border-strong);
+  transform: translateY(-2px);
+}
+
+.glass-card:active {
+  transform: translateY(0);
 }
 
 .glass-elevated {
@@ -377,7 +383,7 @@ body {
   font-weight: 500;
   border-radius: var(--radius-full);
   background: var(--accent-subtle);
-  color: var(--accent);
+  color: var(--accent-fg);
 }
 
 /* Skeleton loader */

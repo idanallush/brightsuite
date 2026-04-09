@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/cpa/supabase-server";
+import { requireApiAuth } from "@/lib/auth/require-auth-api";
 
 export async function GET(request: NextRequest) {
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
+
   try {
     const { searchParams } = request.nextUrl;
     const clientId = searchParams.get("client_id");
@@ -14,9 +18,14 @@ export async function GET(request: NextRequest) {
       query = query.eq("client_id", clientId);
     }
 
-    const { data: configs, error } = await query;
+    // Scope to user (admin sees all, legacy rows without created_by_user_id are visible)
+    if (session.role !== 'admin') {
+      query = query.or(`created_by_user_id.eq.${session.userId},created_by_user_id.is.null`);
+    }
 
-    if (error) {
+    const { data: configs, error: dbError } = await query;
+
+    if (dbError) {
       return NextResponse.json(
         { error: "Failed to fetch alert configs" },
         { status: 500 }
@@ -24,8 +33,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ data: configs });
-  } catch (error) {
-    console.error("Alert config GET error:", error);
+  } catch (err) {
+    console.error("Alert config GET error:", err);
     return NextResponse.json(
       { error: "Failed to fetch alert configs" },
       { status: 500 }
@@ -34,6 +43,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
+
   try {
     const body = await request.json();
     const {
@@ -64,19 +76,20 @@ export async function POST(request: NextRequest) {
       notify_slack_webhook: notify_slack_webhook || null,
       notify_telegram_chat_id: notify_telegram_chat_id || null,
       is_enabled: is_enabled ?? true,
+      created_by_user_id: session.userId,
     };
 
     if (id) {
       // Update existing config
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from("alert_configs")
         .update(record)
         .eq("id", id)
         .select()
         .single();
 
-      if (error) {
-        console.error("Alert config update error:", error);
+      if (dbError) {
+        console.error("Alert config update error:", dbError);
         return NextResponse.json(
           { error: "Failed to update alert config" },
           { status: 500 }
@@ -86,14 +99,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ data });
     } else {
       // Insert new config
-      const { data, error } = await supabase
+      const { data, error: dbError } = await supabase
         .from("alert_configs")
         .insert(record)
         .select()
         .single();
 
-      if (error) {
-        console.error("Alert config insert error:", error);
+      if (dbError) {
+        console.error("Alert config insert error:", dbError);
         return NextResponse.json(
           { error: "Failed to create alert config" },
           { status: 500 }
@@ -102,8 +115,8 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({ data }, { status: 201 });
     }
-  } catch (error) {
-    console.error("Alert config POST error:", error);
+  } catch (err) {
+    console.error("Alert config POST error:", err);
     return NextResponse.json(
       { error: "Failed to save alert config" },
       { status: 500 }

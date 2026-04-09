@@ -1,18 +1,24 @@
 "use client";
 
+import useSWR from "swr";
 import { ChevronDown, EyeOff } from "lucide-react";
-import type { ClientCardData, CpaStatus, TopicMetrics } from "@/lib/cpa/types/dashboard";
+import type { ClientCardData, CpaStatus, TopicMetrics, SparklineData } from "@/lib/cpa/types/dashboard";
 import { Card, CardContent } from "@/components/cpa/ui/card";
 import { CpaBadge } from "@/components/cpa/dashboard/cpa-badge";
 import { CampaignManageDialog } from "@/components/cpa/dashboard/campaign-manage-dialog";
+import { Sparkline } from "@/components/cpa/dashboard/sparkline";
+import { ChangeBadge } from "@/components/cpa/dashboard/change-badge";
 import { formatMetricValue, formatCurrency } from "@/lib/cpa/format";
 import { METRIC_PRESETS } from "@/lib/cpa/metric-presets";
+import { useDashboardStore } from "@/stores/cpa/dashboard-store";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/cpa/ui/tooltip";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface ClientCardSimpleProps {
   data: ClientCardData;
@@ -48,8 +54,24 @@ function getMetricValue(topic: TopicMetrics, key: string): number | null {
   return map[key] ?? null;
 }
 
+function getChangeInfo(topic: TopicMetrics, key: string): { pct: number | null | undefined; invert: boolean } {
+  if (key === "spend") return { pct: topic.spend_change_pct, invert: false };
+  if (key === "cpl" || key === "cpa") return { pct: topic.cpa_change_pct, invert: true };
+  return { pct: undefined, invert: false };
+}
+
 export function ClientCardSimple({ data, isCollapsed, onToggleCollapse, onHide }: ClientCardSimpleProps) {
   const topic = data.topics[0];
+  const { dateRange } = useDashboardStore();
+
+  const { data: sparklineList } = useSWR<SparklineData[]>(
+    `/api/cpa/dashboard/sparkline?since=${dateRange.since}&until=${dateRange.until}`,
+    fetcher,
+    { dedupingInterval: 600000 }
+  );
+
+  const sparklineData = sparklineList?.find((s) => s.client_id === data.client_id);
+
   if (!topic) return null;
 
   const overshootPercent =
@@ -72,11 +94,11 @@ export function ClientCardSimple({ data, isCollapsed, onToggleCollapse, onHide }
 
       {/* Clickable header */}
       <div
-        className="flex items-center justify-between gap-3 px-5 pt-4 pb-3 cursor-pointer select-none"
+        className="flex items-center justify-between gap-3 px-3 sm:px-5 pt-4 pb-3 cursor-pointer select-none"
         onClick={onToggleCollapse}
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          <h3 className="text-base font-bold leading-tight truncate">{data.client_name}</h3>
+          <h3 className="text-sm sm:text-base font-bold leading-tight truncate">{data.client_name}</h3>
           <div onClick={(e) => e.stopPropagation()}>
             <CampaignManageDialog data={data} />
           </div>
@@ -120,33 +142,47 @@ export function ClientCardSimple({ data, isCollapsed, onToggleCollapse, onHide }
         }`}
       >
         <div className="overflow-hidden">
-          <CardContent className="px-5 pb-5 pt-0 space-y-4">
+          <CardContent className="px-3 sm:px-5 pb-4 sm:pb-5 pt-0 space-y-4">
             {/* Dynamic metrics grid based on metric_type */}
             <div className="grid grid-cols-2 gap-3">
-              {preset.displayFields.map((field) => (
-                <div key={field.key} className="space-y-0.5">
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
-                    {field.label}
-                  </p>
-                  <p className="text-lg font-bold tabular-nums">
-                    {formatMetricValue(
-                      getMetricValue(topic, field.key),
-                      field.format,
-                      data.currency
-                    )}
-                  </p>
-                </div>
-              ))}
+              {preset.displayFields.map((field) => {
+                const changeInfo = getChangeInfo(topic, field.key);
+                return (
+                  <div key={field.key} className="space-y-0.5">
+                    <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">
+                      {field.label}
+                    </p>
+                    <div className="flex items-baseline gap-1.5">
+                      <p className="text-base sm:text-lg font-bold tabular-nums">
+                        {formatMetricValue(
+                          getMetricValue(topic, field.key),
+                          field.format,
+                          data.currency
+                        )}
+                      </p>
+                      <ChangeBadge changePercent={changeInfo.pct} invertColor={changeInfo.invert} />
+                    </div>
+                  </div>
+                );
+              })}
               {/* Always show target */}
               {topic.tcpa !== null && (
                 <div className="space-y-0.5">
                   <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wide">יעד</p>
-                  <p className="text-lg font-bold tabular-nums text-muted-foreground">
+                  <p className="text-base sm:text-lg font-bold tabular-nums text-muted-foreground">
                     {formatMetricValue(topic.tcpa, "currency", topic.tcpa_currency ?? data.currency)}
                   </p>
                 </div>
               )}
             </div>
+
+            {/* Sparkline trend */}
+            {sparklineData && sparklineData.daily.length >= 2 && (
+              <Sparkline
+                data={sparklineData.daily}
+                tcpa={topic.tcpa}
+              />
+            )}
           </CardContent>
         </div>
       </div>

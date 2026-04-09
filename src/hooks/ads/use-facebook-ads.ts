@@ -32,7 +32,8 @@ export function useFacebookAds(
 
   const { data, error, isLoading, mutate } = useSWR(key, fetcher, {
     revalidateOnFocus: false,
-    dedupingInterval: 30000,
+    dedupingInterval: 600000, // 10 minutes — ads data cached between tool switches
+    revalidateIfStale: false,
   });
 
   return {

@@ -1,21 +1,22 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "@/lib/auth/session";
+import { requireApiAuth } from "@/lib/auth/require-auth-api";
 import { listReports } from "@/lib/ads/reports/storage";
 
 /**
  * GET /api/ads/reports
  *
- * Returns the list of all saved PDF reports from Vercel Blob storage.
+ * Returns the list of saved PDF reports, scoped to user (admin sees all).
  */
 export async function GET() {
-  const session = await getServerSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
 
   try {
     console.log("[REPORTS] Fetching reports list...");
-    const reports = await listReports();
+    // Admin sees all reports, regular users see their own + legacy
+    const reports = session.role === 'admin'
+      ? await listReports()
+      : await listReports(session.userId);
     console.log("[REPORTS] Found reports:", reports.length);
     if (reports.length > 0) {
       console.log("[REPORTS] First report:", JSON.stringify(reports[0]));

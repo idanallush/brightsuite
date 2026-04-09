@@ -2,6 +2,18 @@ import type { MetricType } from "@/lib/cpa/metric-presets";
 
 export type CpaStatus = "green" | "yellow" | "red" | "no_data";
 
+export interface DailyMetric {
+  date: string;
+  spend: number;
+  conversions: number;
+  cpa: number;
+}
+
+export interface SparklineData {
+  client_id: string;
+  daily: DailyMetric[];
+}
+
 export interface TopicMetrics {
   topic_id: string;
   topic_name: string;
@@ -21,6 +33,12 @@ export interface TopicMetrics {
   ctr: number | null;
   cpm: number | null;
   reach: number;
+  // Period comparison fields (optional, only when compare=true)
+  prev_spend?: number;
+  prev_conversions?: number;
+  prev_cpa?: number | null;
+  spend_change_pct?: number | null;
+  cpa_change_pct?: number | null;
 }
 
 export interface ClientCardData {

@@ -79,9 +79,9 @@ export async function POST(request: NextRequest) {
 
     // Changelog entry
     await db.execute({
-      sql: `INSERT INTO bf_changelog (campaign_id, action, description, performed_by)
-            VALUES (?, 'campaign_added', ?, ?)`,
-      args: [campaignId, `קמפיין חדש נוסף: ${name}`, auth.session.name],
+      sql: `INSERT INTO bf_changelog (campaign_id, action, description, performed_by, created_by_user_id)
+            VALUES (?, 'campaign_added', ?, ?, ?)`,
+      args: [campaignId, `קמפיין חדש נוסף: ${name}`, auth.session.name, auth.session.userId],
     });
 
     return json(newCampaign, 201);

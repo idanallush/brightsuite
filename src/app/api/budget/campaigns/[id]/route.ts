@@ -77,14 +77,15 @@ export async function PUT(
 
       // Changelog
       await db.execute({
-        sql: `INSERT INTO bf_changelog (campaign_id, action, description, old_value, new_value, performed_by)
-              VALUES (?, 'budget_change', ?, ?, ?, ?)`,
+        sql: `INSERT INTO bf_changelog (campaign_id, action, description, old_value, new_value, performed_by, created_by_user_id)
+              VALUES (?, 'budget_change', ?, ?, ?, ?, ?)`,
         args: [
           id,
           `תקציב שונה מ-₪${old_budget} ל-₪${new_budget}, החל מ-${effective_date}`,
           String(old_budget),
           String(new_budget),
           auth.session.name,
+          auth.session.userId,
         ],
       });
 
@@ -125,13 +126,14 @@ export async function PUT(
 
       // Changelog
       await db.execute({
-        sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by)
-              VALUES (?, 'status_change', ?, ?, ?)`,
+        sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by, created_by_user_id)
+              VALUES (?, 'status_change', ?, ?, ?, ?)`,
         args: [
           id,
           `סטטוס שונה ל${statusLabels[status] ?? status}`,
           status,
           auth.session.name,
+          auth.session.userId,
         ],
       });
 
@@ -163,13 +165,14 @@ export async function PUT(
 
       // Changelog
       await db.execute({
-        sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by)
-              VALUES (?, 'campaign_removed', ?, ?, ?)`,
+        sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by, created_by_user_id)
+              VALUES (?, 'campaign_removed', ?, ?, ?, ?)`,
         args: [
           id,
           `קמפיין הוצא מתוכנית התקציב החל מ-${effective_date}`,
           effective_date,
           auth.session.name,
+          auth.session.userId,
         ],
       });
 

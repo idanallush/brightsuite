@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { LayoutDashboard, AlertTriangle, Settings } from 'lucide-react';
+import { AlertsBell } from '@/components/cpa/dashboard/alerts-bell';
 
 const navItems = [
   { href: '/cpa', label: 'דשבורד', icon: LayoutDashboard },
@@ -20,7 +21,7 @@ function CpaNav() {
 
   return (
     <div className="px-6 mb-4" style={{ borderBottom: '1px solid var(--glass-border)' }}>
-      <nav className="flex gap-1 -mb-px">
+      <nav className="flex items-center gap-1 -mb-px">
         {navItems.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -39,6 +40,8 @@ function CpaNav() {
             </Link>
           );
         })}
+        <div className="flex-1" />
+        <AlertsBell />
       </nav>
     </div>
   );

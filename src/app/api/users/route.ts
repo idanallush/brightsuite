@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth/session';
 import { getTurso } from '@/lib/db/turso';
-import { hashPassword } from '@/lib/auth/password';
 import { logAudit } from '@/lib/audit';
 import type { ToolSlug } from '@/types/auth';
 
@@ -54,15 +53,14 @@ export async function POST(request: NextRequest) {
     const { action } = body;
 
     if (action === 'create') {
-      const { name, email, password, role, tools } = body as {
+      const { name, email, role, tools } = body as {
         name: string;
         email: string;
-        password: string;
         role: string;
         tools: ToolSlug[];
       };
 
-      if (!name || !email || !password) {
+      if (!name || !email) {
         return NextResponse.json(
           { error: 'שדות חובה חסרים' },
           { status: 400 },
@@ -82,12 +80,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const passwordHash = await hashPassword(password);
-
       const insertResult = await db.execute({
         sql: `INSERT INTO bs_users (name, email, password_hash, role, is_active, created_at)
-              VALUES (?, ?, ?, ?, 1, datetime('now'))`,
-        args: [name, email, passwordHash, role || 'viewer'],
+              VALUES (?, ?, NULL, ?, 1, datetime('now'))`,
+        args: [name, email, role || 'viewer'],
       });
 
       const newUserId = Number(insertResult.lastInsertRowid);

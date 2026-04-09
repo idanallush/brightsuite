@@ -22,6 +22,11 @@ interface TopicMetrics {
   ctr: number | null;
   cpm: number | null;
   reach: number;
+  prev_spend?: number;
+  prev_conversions?: number;
+  prev_cpa?: number | null;
+  spend_change_pct?: number | null;
+  cpa_change_pct?: number | null;
 }
 
 interface ClientCardData {
@@ -103,12 +108,25 @@ export async function GET(request: NextRequest) {
     const { searchParams } = request.nextUrl;
     const since = searchParams.get("since");
     const until = searchParams.get("until");
+    const compare = searchParams.get("compare") === "true";
 
     if (!since || !until) {
       return NextResponse.json(
         { error: "Missing since or until query parameters" },
         { status: 400 }
       );
+    }
+
+    // Calculate previous period for comparison
+    let prevDateRange: { since: string; until: string } | null = null;
+    if (compare) {
+      const sinceDate = new Date(since + "T00:00:00");
+      const untilDate = new Date(until + "T00:00:00");
+      const durationMs = untilDate.getTime() - sinceDate.getTime();
+      const prevUntilDate = new Date(sinceDate.getTime() - 86400000); // day before since
+      const prevSinceDate = new Date(prevUntilDate.getTime() - durationMs);
+      const pad = (d: Date) => d.toISOString().split("T")[0];
+      prevDateRange = { since: pad(prevSinceDate), until: pad(prevUntilDate) };
     }
 
     const supabase = createServiceRoleClient();
@@ -297,6 +315,107 @@ export async function GET(request: NextRequest) {
           const tcpa = topic.tcpa ?? null;
           const status = determineStatus(cpa, tcpa);
 
+          // Fetch previous period metrics for comparison
+          let prevSpend: number | undefined;
+          let prevConversions: number | undefined;
+          let prevCpa: number | null | undefined;
+          let spendChangePct: number | null | undefined;
+          let cpaChangePct: number | null | undefined;
+
+          if (compare && prevDateRange) {
+            const prevOneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+            const { data: prevCached } = await supabase
+              .from("metrics_cache")
+              .select("*")
+              .eq("topic_id", topic.id)
+              .eq("date_since", prevDateRange.since)
+              .eq("date_until", prevDateRange.until)
+              .gt("fetched_at", prevOneHourAgo)
+              .limit(1)
+              .single();
+
+            let prevParsedMetrics: ReturnType<typeof parseInsights>;
+
+            if (prevCached) {
+              prevParsedMetrics = prevCached.metrics as ReturnType<typeof parseInsights>;
+            } else {
+              const prevInsightsMap = await fetchInsightsBatch(
+                campaignIds,
+                prevDateRange,
+                accessToken
+              );
+
+              let pTotalSpend = 0;
+              let pTotalImpressions = 0;
+              let pTotalClicks = 0;
+              let pTotalLeads = 0;
+              let pTotalPurchases = 0;
+              let pTotalRevenue = 0;
+              let pTotalReach = 0;
+
+              for (const insights of prevInsightsMap.values()) {
+                if (!insights) continue;
+                const parsed = parseInsights(insights);
+                pTotalSpend += parsed.spend ?? 0;
+                pTotalImpressions += parsed.impressions ?? 0;
+                pTotalClicks += parsed.clicks ?? 0;
+                pTotalLeads += parsed.leads ?? 0;
+                pTotalPurchases += parsed.purchases ?? 0;
+                pTotalRevenue += parsed.revenue ?? 0;
+                pTotalReach += parsed.reach ?? 0;
+              }
+
+              prevParsedMetrics = {
+                spend: pTotalSpend,
+                impressions: pTotalImpressions,
+                reach: pTotalReach,
+                frequency: null,
+                clicks: pTotalClicks,
+                ctr: pTotalImpressions > 0 ? (pTotalClicks / pTotalImpressions) * 100 : null,
+                cpc: pTotalClicks > 0 ? pTotalSpend / pTotalClicks : null,
+                cpm: pTotalImpressions > 0 ? (pTotalSpend / pTotalImpressions) * 1000 : null,
+                leads: pTotalLeads,
+                cpl: pTotalLeads > 0 ? pTotalSpend / pTotalLeads : null,
+                purchases: pTotalPurchases,
+                revenue: pTotalRevenue > 0 ? pTotalRevenue : null,
+                roas: pTotalSpend > 0 && pTotalRevenue > 0 ? pTotalRevenue / pTotalSpend : null,
+                cpa: pTotalPurchases > 0 ? pTotalSpend / pTotalPurchases : null,
+                add_to_cart: null,
+                initiate_checkout: null,
+                results: null,
+                cost_per_result: null,
+              };
+
+              await supabase.from("metrics_cache").upsert(
+                {
+                  topic_id: topic.id,
+                  date_since: prevDateRange.since,
+                  date_until: prevDateRange.until,
+                  metrics: prevParsedMetrics,
+                  fetched_at: new Date().toISOString(),
+                },
+                { onConflict: "topic_id,date_since,date_until" }
+              );
+            }
+
+            const pConversions = getConversionsForMetricType(
+              prevParsedMetrics,
+              metricType,
+              effectiveConversionType
+            );
+            const pSpend = prevParsedMetrics.spend ?? 0;
+            const pCpa = pConversions > 0 ? pSpend / pConversions : null;
+
+            prevSpend = pSpend;
+            prevConversions = pConversions;
+            prevCpa = pCpa;
+            spendChangePct = pSpend > 0 ? ((spend - pSpend) / pSpend) * 100 : null;
+            cpaChangePct =
+              cpa !== null && pCpa !== null && pCpa > 0
+                ? ((cpa - pCpa) / pCpa) * 100
+                : null;
+          }
+
           topicMetrics.push({
             topic_id: topic.id,
             topic_name: topic.name,
@@ -315,6 +434,15 @@ export async function GET(request: NextRequest) {
             ctr: parsedMetrics.ctr,
             cpm: parsedMetrics.cpm,
             reach: parsedMetrics.reach ?? 0,
+            ...(compare
+              ? {
+                  prev_spend: prevSpend,
+                  prev_conversions: prevConversions,
+                  prev_cpa: prevCpa,
+                  spend_change_pct: spendChangePct,
+                  cpa_change_pct: cpaChangePct,
+                }
+              : {}),
           });
         }
 

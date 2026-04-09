@@ -65,7 +65,7 @@ function parseFilters(raw?: string): string {
 }
 
 export default function ReportsPage() {
-  const { tools, loading: authLoading } = useAuth();
+  const { hasToolAccess, loading: authLoading } = useAuth();
   const { data: reports, error, isLoading, mutate } = useSWR<Report[]>(
     "/api/ads/reports",
     fetcher,
@@ -77,7 +77,7 @@ export default function ReportsPage() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   // Permission check AFTER all hooks
-  if (!authLoading && !tools.includes('ads')) {
+  if (!authLoading && !hasToolAccess('ads')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <h2 className="text-base font-medium text-zinc-700 mb-1">אין גישה לכלי זה</h2>

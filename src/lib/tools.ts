@@ -40,7 +40,7 @@ export const TOOLS: ToolDefinition[] = [
     description: 'צפייה בקריאייטיב פעיל וייצוא דוחות PDF',
     icon: 'Image',
     href: '/ads',
-    color: '#2563eb',
+    color: '#FFDF4F',
   },
   {
     slug: 'writer',

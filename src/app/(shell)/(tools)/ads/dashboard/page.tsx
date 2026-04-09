@@ -44,6 +44,8 @@ import {
 } from "@/components/cpa/ui/dropdown-menu";
 import { RefreshCcw, Search, X, SlidersHorizontal, Filter, LayoutGrid, Megaphone, Download, Loader2, XCircle, Check, BarChart3, FolderPlus, Plus } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { SyncProgress } from "@/components/ui/sync-progress";
+import { HelpTip } from "@/components/ui/help-tip";
 
 // ------------------------------------------------------------------
 // Summary Groups
@@ -366,7 +368,7 @@ function SelectionSummaryBar({
 function AdLibraryContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { tools, loading: authLoading } = useAuth();
+  const { hasToolAccess, loading: authLoading } = useAuth();
 
   const { accounts, isLoading: accountsLoading } = useFacebookAccounts();
   const selectedAccountId = useAdStore((s) => s.selectedAccountId);
@@ -690,7 +692,7 @@ function AdLibraryContent() {
   ];
 
   // Permission check AFTER all hooks
-  if (!authLoading && !tools.includes('ads')) {
+  if (!authLoading && !hasToolAccess('ads')) {
     return (
       <div className="flex flex-col items-center justify-center py-24 text-center">
         <h2 className="text-base font-medium text-zinc-700 mb-1">אין גישה לכלי זה</h2>
@@ -724,16 +726,25 @@ function AdLibraryContent() {
         </TabsList>
 
       <div className="flex flex-row-reverse flex-wrap gap-3 items-center">
-        <AccountSelector
-          accounts={accounts}
-          selectedAccountId={selectedAccountId}
-          onAccountChange={handleAccountChange}
-          isLoading={accountsLoading}
-        />
+        <div className="flex items-center gap-1">
+          <AccountSelector
+            accounts={accounts}
+            selectedAccountId={selectedAccountId}
+            onAccountChange={handleAccountChange}
+            isLoading={accountsLoading}
+          />
+          <HelpTip text="בחר את חשבון הפרסום שממנו תרצה לטעון מודעות. ניתן לנהל חשבונות בהגדרות." />
+        </div>
 
-        <DateRangePicker dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
+        <div className="flex items-center gap-1">
+          <DateRangePicker dateRange={dateRange} onDateRangeChange={handleDateRangeChange} />
+          <HelpTip text="טווח התאריכים קובע את תקופת המדדים (הוצאות, לידים וכו'). ברירת מחדל: 7 ימים אחרונים." />
+        </div>
 
-        <MetricPresetSelector value={activePreset} onChange={handlePresetChange} />
+        <div className="flex items-center gap-1">
+          <MetricPresetSelector value={activePreset} onChange={handlePresetChange} />
+          <HelpTip text="בחר פריסט מטריקות מותאם לסוג הקמפיין: לידים, איקומרס או אנגייג'מנט." />
+        </div>
 
         <div className="flex-1" />
 
@@ -956,12 +967,19 @@ function AdLibraryContent() {
         />
       )}
 
+      {accountsLoading && (
+        <SyncProgress message="טוען חשבונות..." subtitle="מתחבר לפייסבוק" />
+      )}
+
       {!selectedAccountId && !accountsLoading && (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <LayoutGrid className="h-12 w-12 text-zinc-200 mb-4" aria-hidden="true" />
           <h2 className="text-base font-medium text-zinc-700 mb-1">בחר חשבון מודעות</h2>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-400 mb-2">
             בחר חשבון מהתפריט למעלה כדי לצפות במודעות שלו.
+          </p>
+          <p className="text-xs text-zinc-300">
+            חבר את חשבון הפייסבוק שלך דרך הגדרות &gt; חיבורים, ואז בחר חשבון מודעות.
           </p>
         </div>
       )}

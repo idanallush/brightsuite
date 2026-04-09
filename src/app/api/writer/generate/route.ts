@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getTurso } from '@/lib/db/turso';
 import { buildPrompt } from '@/lib/writer/prompts';
+import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
 const toNum = (v: unknown): number => typeof v === 'bigint' ? Number(v) : v as number;
 
@@ -36,6 +37,9 @@ function parseAIResponse(raw: string) {
 
 // POST /api/writer/generate
 export async function POST(request: NextRequest) {
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
+
   const {
     clientId,
     url,
@@ -105,8 +109,8 @@ export async function POST(request: NextRequest) {
 
     // Save to database
     const genResult = await db.execute({
-      sql: 'INSERT INTO generations (client_id, brief, campaign, platforms, language) VALUES (?, ?, ?, ?, ?)',
-      args: [clientId || null, url || '', additionalNotes || '', JSON.stringify(platforms), language || 'he'],
+      sql: 'INSERT INTO generations (client_id, brief, campaign, platforms, language, created_by_user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      args: [clientId || null, url || '', additionalNotes || '', JSON.stringify(platforms), language || 'he', session.userId],
     });
 
     const generationId = toNum(genResult.lastInsertRowid);

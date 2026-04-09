@@ -1,24 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "@/lib/auth/session";
+import { requireApiAuth } from "@/lib/auth/require-auth-api";
 import { getReport, readReportPdf, deleteReport } from "@/lib/ads/reports/storage";
 
 /**
  * GET /api/ads/reports/:id
- * Download a specific saved report PDF.
+ * Download a specific saved report PDF (verify ownership).
  */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
 
   const { id } = await params;
   const report = await getReport(id);
 
   if (!report) {
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+  }
+
+  // Verify ownership (admin can access any, legacy reports without createdByUserId are accessible)
+  if (session.role !== 'admin' && report.createdByUserId && report.createdByUserId !== session.userId) {
     return NextResponse.json({ error: "Report not found" }, { status: 404 });
   }
 
@@ -43,18 +46,27 @@ export async function GET(
 
 /**
  * DELETE /api/ads/reports/:id
- * Delete a report record and its PDF file.
+ * Delete a report record and its PDF file (verify ownership).
  */
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await getServerSession();
-  if (!session.userId) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-  }
+  const { session, error } = await requireApiAuth();
+  if (error) return error;
 
   const { id } = await params;
+  const report = await getReport(id);
+
+  if (!report) {
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+  }
+
+  // Verify ownership (admin can delete any, legacy reports without createdByUserId are deletable)
+  if (session.role !== 'admin' && report.createdByUserId && report.createdByUserId !== session.userId) {
+    return NextResponse.json({ error: "Report not found" }, { status: 404 });
+  }
+
   const deleted = await deleteReport(id);
 
   if (!deleted) {

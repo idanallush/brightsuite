@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { getTurso } from '@/lib/db/turso';
 import { buildRegeneratePrompt } from '@/lib/writer/prompts';
+import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
@@ -34,6 +35,9 @@ function parseAIResponse(raw: string) {
 
 // POST /api/writer/generate/regenerate — regenerate a single block
 export async function POST(request: NextRequest) {
+  const { error } = await requireApiAuth();
+  if (error) return error;
+
   const {
     clientId,
     url,

@@ -207,7 +207,7 @@ export default function WriterOutputPage() {
           <button
             onClick={handleBack}
             className="flex items-center gap-1.5 text-sm transition-colors"
-            style={{ color: 'var(--accent)' }}
+            style={{ color: 'var(--accent-fg)' }}
           >
             <ArrowRight className="w-4 h-4" />
             <span>חזרה לבריף</span>
@@ -231,7 +231,7 @@ export default function WriterOutputPage() {
         <button
           onClick={handleBack}
           className="flex items-center gap-1.5 text-sm transition-colors"
-          style={{ color: 'var(--accent)' }}
+          style={{ color: 'var(--accent-fg)' }}
         >
           <ArrowRight className="w-4 h-4" />
           <span>חזרה לבריף</span>

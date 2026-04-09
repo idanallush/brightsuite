@@ -2,8 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { User, Users, ClipboardList } from 'lucide-react';
+import { User, Users, ClipboardList, Link2 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
+import { motion } from 'motion/react';
 
 interface TabItem {
   label: string;
@@ -15,6 +16,7 @@ interface TabItem {
 const tabs: TabItem[] = [
   { label: 'פרופיל', href: '/settings', icon: User },
   { label: 'ניהול צוות', href: '/settings/team', icon: Users, adminOnly: true },
+  { label: 'חיבורים', href: '/settings/connections', icon: Link2 },
   { label: 'לוג פעילות', href: '/settings/audit', icon: ClipboardList },
 ];
 
@@ -29,39 +31,69 @@ export default function SettingsLayout({
 
   const visibleTabs = tabs.filter((tab) => !tab.adminOnly || isAdmin);
 
+  const isActive = (href: string) => {
+    if (href === '/settings') return pathname === '/settings';
+    return pathname.startsWith(href);
+  };
+
   return (
     <div>
-      <h1
-        className="text-2xl font-semibold mb-6"
+      <motion.h1
+        className="text-2xl font-semibold mb-1"
         style={{ color: 'var(--text-primary)' }}
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: 'easeOut' }}
       >
         הגדרות
-      </h1>
+      </motion.h1>
 
-      <div className="flex gap-2 mb-6">
-        {visibleTabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = pathname === tab.href;
+      <motion.p
+        className="text-sm mb-5"
+        style={{ color: 'var(--text-muted)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut', delay: 0.05 }}
+      >
+        ניהול פרופיל, צוות והרשאות
+      </motion.p>
 
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors"
-              style={{
-                background: isActive ? '#2563eb' : 'rgba(255,255,255,0.6)',
-                color: isActive ? '#ffffff' : 'var(--text-secondary)',
-                border: isActive ? 'none' : '1px solid var(--border)',
-              }}
-            >
-              <Icon size={16} />
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
+      <motion.div
+        className="mb-6"
+        style={{ borderBottom: '1px solid var(--glass-border)' }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut', delay: 0.08 }}
+      >
+        <nav className="flex gap-1 -mb-px">
+          {visibleTabs.map((tab) => {
+            const active = isActive(tab.href);
+            const Icon = tab.icon;
+            return (
+              <Link
+                key={tab.href}
+                href={tab.href}
+                className="flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium border-b-2 transition-colors"
+                style={{
+                  color: active ? 'var(--accent-fg)' : 'var(--text-secondary)',
+                  borderBottomColor: active ? 'var(--accent)' : 'transparent',
+                }}
+              >
+                <Icon className="w-4 h-4" />
+                <span>{tab.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+      </motion.div>
 
-      {children}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.3, ease: 'easeOut', delay: 0.12 }}
+      >
+        {children}
+      </motion.div>
     </div>
   );
 }

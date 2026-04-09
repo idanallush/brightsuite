@@ -85,7 +85,7 @@ function WriterNav() {
                   : 'border-transparent hover:border-white/[0.1]'
               }`}
               style={{
-                color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                color: active ? 'var(--accent-fg)' : 'var(--text-secondary)',
               }}
             >
               <Icon className="w-4 h-4" />
