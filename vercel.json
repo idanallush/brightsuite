@@ -22,12 +22,22 @@
     },
     "src/app/api/cpa/cron/refresh/route.ts": {
       "maxDuration": 60
+    },
+    "src/app/api/cron/ad-sync/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/ads-hub/sync/backfill/route.ts": {
+      "maxDuration": 120
     }
   },
   "crons": [
     {
       "path": "/api/cpa/cron/refresh",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/ad-sync",
+      "schedule": "0 21 * * *"
     }
   ]
 }

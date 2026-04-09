@@ -50,4 +50,12 @@ export const TOOLS: ToolDefinition[] = [
     href: '/writer',
     color: '#d946ef',
   },
+  {
+    slug: 'ads-hub',
+    name: 'Ads Hub',
+    description: 'דשבורד מאוחד לנתוני פרסום מכל הפלטפורמות',
+    icon: 'BarChart3',
+    href: '/ads-hub',
+    color: '#3b82f6',
+  },
 ];

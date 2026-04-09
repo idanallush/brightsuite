@@ -10,6 +10,7 @@ import {
   Target,
   Image,
   PenLine,
+  BarChart3,
   X,
   PanelRightClose,
   PanelRightOpen,
@@ -26,6 +27,7 @@ const iconMap: Record<string, LucideIcon> = {
   Target,
   Image,
   PenLine,
+  BarChart3,
 };
 
 const SidebarContent = ({

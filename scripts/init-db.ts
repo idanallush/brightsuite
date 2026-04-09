@@ -188,6 +188,104 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_bf_changelog_client ON bf_changelog(client_id);
   `);
 
+  // Ads Hub tables (ah_ prefix)
+  console.log('Creating Ads Hub tables...');
+  await db.executeMultiple(`
+    CREATE TABLE IF NOT EXISTS ah_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      slug TEXT UNIQUE NOT NULL,
+      meta_account_id TEXT,
+      google_customer_id TEXT,
+      google_mcc_id TEXT,
+      ga4_property_id TEXT,
+      currency TEXT DEFAULT 'ILS',
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ah_campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL CHECK (platform IN ('meta', 'google', 'ga4')),
+      platform_campaign_id TEXT NOT NULL,
+      name TEXT NOT NULL,
+      status TEXT,
+      objective TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(platform, platform_campaign_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS ah_performance_daily (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL CHECK (platform IN ('meta', 'google', 'ga4')),
+      campaign_id TEXT NOT NULL,
+      date TEXT NOT NULL,
+      impressions INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
+      conversions REAL DEFAULT 0,
+      spend REAL DEFAULT 0,
+      cpc REAL,
+      ctr REAL,
+      cpl REAL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(platform, campaign_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS ah_video_ads (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      meta_ad_id TEXT NOT NULL UNIQUE,
+      meta_campaign_id TEXT,
+      ad_name TEXT,
+      video_id TEXT,
+      thumbnail_url TEXT,
+      utm_source TEXT DEFAULT 'meta',
+      utm_medium TEXT DEFAULT 'paid',
+      utm_campaign TEXT,
+      utm_content TEXT,
+      transcript TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS ah_video_performance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      video_ad_id INTEGER NOT NULL REFERENCES ah_video_ads(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      impressions INTEGER DEFAULT 0,
+      views INTEGER DEFAULT 0,
+      spend REAL DEFAULT 0,
+      p25 INTEGER DEFAULT 0,
+      p50 INTEGER DEFAULT 0,
+      p75 INTEGER DEFAULT 0,
+      p95 INTEGER DEFAULT 0,
+      p100 INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(video_ad_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS ah_sync_log (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER REFERENCES ah_clients(id) ON DELETE SET NULL,
+      platform TEXT NOT NULL,
+      sync_type TEXT NOT NULL CHECK (sync_type IN ('daily', 'backfill', 'video_discovery')),
+      status TEXT NOT NULL CHECK (status IN ('success', 'error', 'partial', 'skipped')),
+      records_synced INTEGER DEFAULT 0,
+      error_message TEXT,
+      started_at TEXT NOT NULL,
+      completed_at TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_ah_perf_client_date ON ah_performance_daily(client_id, date);
+    CREATE INDEX IF NOT EXISTS idx_ah_perf_platform_campaign ON ah_performance_daily(platform, campaign_id, date);
+    CREATE INDEX IF NOT EXISTS idx_ah_sync_client ON ah_sync_log(client_id, started_at);
+    CREATE INDEX IF NOT EXISTS idx_ah_campaigns_client ON ah_campaigns(client_id);
+    CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
+  `);
+
   // Create admin user (will sign in via Google OAuth)
   console.log('\nCreating admin user...');
   const email = 'idan@b-bright.co.il';
@@ -208,7 +306,7 @@ async function init() {
   }
 
   // Grant all tool permissions
-  const tools = ['ad-checker', 'budget', 'cpa', 'ads', 'writer'];
+  const tools = ['ad-checker', 'budget', 'cpa', 'ads', 'writer', 'ads-hub'];
   for (const tool of tools) {
     await db.execute({
       sql: 'INSERT OR IGNORE INTO bs_tool_permissions (user_id, tool_slug, granted_by) VALUES (?, ?, ?)',
