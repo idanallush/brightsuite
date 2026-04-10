@@ -1,12 +1,12 @@
 'use client';
 
-import { DollarSign, Eye, MousePointerClick, Target } from 'lucide-react';
-
 interface KpiCardsProps {
   spend: number;
   impressions: number;
+  clicks: number;
   conversions: number;
   cpl: number | null;
+  ctr: number | null;
   loading?: boolean;
 }
 
@@ -17,78 +17,66 @@ const formatNumber = (n: number): string => {
 };
 
 const formatCurrency = (n: number): string => {
-  return `${n.toLocaleString('he-IL', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+  return `₪${n.toLocaleString('he-IL', { maximumFractionDigits: 0 })}`;
 };
 
-const cards = [
-  {
-    key: 'spend',
-    label: 'הוצאה כוללת',
-    icon: DollarSign,
-    color: '#c0392b',
-    format: (v: number) => `₪${formatCurrency(v)}`,
-  },
-  {
-    key: 'impressions',
-    label: 'חשיפות',
-    icon: Eye,
-    color: '#2563a0',
-    format: formatNumber,
-  },
-  {
-    key: 'conversions',
-    label: 'המרות',
-    icon: MousePointerClick,
-    color: '#1a7a4c',
-    format: (v: number) => v.toLocaleString('he-IL', { maximumFractionDigits: 0 }),
-  },
-  {
-    key: 'cpl',
-    label: 'עלות להמרה',
-    icon: Target,
-    color: '#6d4c9e',
-    format: (v: number | null) => (v !== null ? `₪${v.toFixed(1)}` : '—'),
-  },
-] as const;
+type Variant = 'default' | 'green' | 'red' | 'amber' | 'blue' | 'purple';
 
-export const KpiCards = ({ spend, impressions, conversions, cpl, loading }: KpiCardsProps) => {
-  const values: Record<string, number | null> = { spend, impressions, conversions, cpl };
+const variantStyles: Record<Variant, string> = {
+  default: 'bg-white border-[#e5e5e0]',
+  green: 'bg-[#e8f5ee] border-[#c6e7d3]',
+  red: 'bg-[#fceaea] border-[#f5cbcb]',
+  amber: 'bg-[#fef6e0] border-[#f5e4b0]',
+  blue: 'bg-[#e8f0fa] border-[#c8d8ee]',
+  purple: 'bg-[#f0eaf8] border-[#dccbed]',
+};
 
+const variantValueStyles: Record<Variant, string> = {
+  default: 'text-[#1a1a1a]',
+  green: 'text-[#1a7a4c]',
+  red: 'text-[#c0392b]',
+  amber: 'text-[#b45309]',
+  blue: 'text-[#2563a0]',
+  purple: 'text-[#6d4c9e]',
+};
+
+interface MetricCardProps {
+  label: string;
+  value: string;
+  variant?: Variant;
+  loading?: boolean;
+}
+
+const MetricCard = ({ label, value, variant = 'default', loading }: MetricCardProps) => (
+  <div className={`rounded-xl border px-4 py-3 ${variantStyles[variant]}`}>
+    <p className="text-[11px] text-[#8a877f] leading-tight mb-1">{label}</p>
+    {loading ? (
+      <div className="h-7 w-20 rounded bg-black/5 animate-pulse" />
+    ) : (
+      <p className={`text-[22px] font-bold leading-tight tabular-nums ${variantValueStyles[variant]}`}>
+        {value}
+      </p>
+    )}
+  </div>
+);
+
+export const KpiCards = ({
+  spend,
+  impressions,
+  clicks,
+  conversions,
+  cpl,
+  ctr,
+  loading,
+}: KpiCardsProps) => {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        const value = values[card.key];
-
-        return (
-          <div
-            key={card.key}
-            className="glass-card rounded-xl py-4 px-5"
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <div
-                className="w-8 h-8 rounded-lg flex items-center justify-center"
-                style={{ background: `${card.color}14` }}
-              >
-                <Icon size={16} style={{ color: card.color }} />
-              </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--text-tertiary)' }}>
-                {card.label}
-              </span>
-            </div>
-            <div
-              className="text-xl font-bold"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {loading ? (
-                <div className="h-7 w-24 rounded bg-gray-200 animate-pulse" />
-              ) : (
-                card.format(value as number & null)
-              )}
-            </div>
-          </div>
-        );
-      })}
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <MetricCard label="הוצאה כוללת" value={formatCurrency(spend)} variant="red" loading={loading} />
+      <MetricCard label="חשיפות" value={formatNumber(impressions)} variant="blue" loading={loading} />
+      <MetricCard label="קליקים" value={formatNumber(clicks)} variant="default" loading={loading} />
+      <MetricCard label="המרות" value={formatNumber(conversions)} variant="green" loading={loading} />
+      <MetricCard label="CPL" value={cpl !== null ? `₪${cpl.toFixed(1)}` : '—'} variant="purple" loading={loading} />
+      <MetricCard label="CTR" value={ctr !== null ? `${ctr.toFixed(2)}%` : '—'} variant="amber" loading={loading} />
     </div>
   );
 };

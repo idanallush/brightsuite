@@ -1,6 +1,37 @@
 import { getTurso } from '@/lib/db/turso';
-import { getGoogleAdsAccessToken } from '@/lib/google/ads-api';
 import type { SyncResult } from './types';
+
+async function getGa4AccessToken(): Promise<string> {
+  // GA4 requires analytics.readonly scope, which is different from Google Ads scope.
+  // Prefer a dedicated GA4 refresh token if provided; otherwise fall back to the
+  // Google Ads token (works only if that token was created with both scopes).
+  const refreshToken = process.env.GA4_REFRESH_TOKEN || process.env.GOOGLE_ADS_REFRESH_TOKEN;
+  const clientId = process.env.GA4_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID;
+  const clientSecret = process.env.GA4_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
+
+  if (!refreshToken || !clientId || !clientSecret) {
+    throw new Error('GA4 credentials not configured');
+  }
+
+  const res = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`GA4 OAuth failed: ${err.slice(0, 200)}`);
+  }
+
+  const data = (await res.json()) as { access_token: string };
+  return data.access_token;
+}
 
 interface GA4ReportRow {
   dimensionValues: Array<{ value: string }>;
@@ -13,11 +44,12 @@ interface GA4ReportResponse {
 }
 
 export function isServiceAvailable(): boolean {
-  return !!(
-    process.env.GOOGLE_ADS_CLIENT_ID &&
-    process.env.GOOGLE_ADS_CLIENT_SECRET &&
-    process.env.GOOGLE_ADS_REFRESH_TOKEN
-  );
+  const hasClient = !!(process.env.GA4_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID);
+  const hasSecret = !!(process.env.GA4_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET);
+  // Only report available if a dedicated GA4 token exists — the Google Ads
+  // refresh token usually doesn't have the analytics.readonly scope.
+  const hasToken = !!process.env.GA4_REFRESH_TOKEN;
+  return hasClient && hasSecret && hasToken;
 }
 
 export async function syncDailyMetrics(
@@ -30,8 +62,7 @@ export async function syncDailyMetrics(
   const db = getTurso();
 
   try {
-    // Reuse Google OAuth token (same refresh token, GA4 scope required)
-    const accessToken = await getGoogleAdsAccessToken();
+    const accessToken = await getGa4AccessToken();
 
     const body = {
       dateRanges: [{ startDate, endDate }],

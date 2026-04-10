@@ -35,11 +35,6 @@ interface MetaAdCreative {
   };
 }
 
-interface MetaAdsResponse {
-  data: MetaAdCreative[];
-  paging?: { next?: string };
-}
-
 export async function isServiceAvailable(): Promise<boolean> {
   const db = getTurso();
   const result = await db.execute({
@@ -75,6 +70,44 @@ function ensureActPrefix(accountId: string): string {
   return cleaned.startsWith('act_') ? cleaned : `act_${cleaned}`;
 }
 
+function addDays(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().split('T')[0];
+}
+
+function chunkDateRange(startDate: string, endDate: string, chunkDays = 7): Array<{ start: string; end: string }> {
+  const chunks: Array<{ start: string; end: string }> = [];
+  let cursor = startDate;
+  while (cursor <= endDate) {
+    const candidateEnd = addDays(cursor, chunkDays - 1);
+    const chunkEnd = candidateEnd > endDate ? endDate : candidateEnd;
+    chunks.push({ start: cursor, end: chunkEnd });
+    cursor = addDays(chunkEnd, 1);
+  }
+  return chunks;
+}
+
+async function fetchInsightsChunk(
+  actId: string,
+  accessToken: string,
+  startDate: string,
+  endDate: string
+): Promise<MetaInsightRow[]> {
+  const fields = 'campaign_id,campaign_name,impressions,clicks,spend,cpc,ctr,actions';
+  const path = `/${actId}/insights?fields=${fields}&level=campaign&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&limit=200`;
+
+  const response = await fbFetch<MetaInsightsResponse>(path, accessToken);
+  const rows = [...(response.data || [])];
+
+  if (response.paging?.next) {
+    const moreRows = await fbFetchAll<MetaInsightRow>(response.paging.next, accessToken, 20);
+    rows.push(...moreRows);
+  }
+
+  return rows;
+}
+
 export async function syncDailyMetrics(
   clientId: number,
   accountId: string,
@@ -87,21 +120,13 @@ export async function syncDailyMetrics(
   const actId = ensureActPrefix(accountId);
 
   try {
-    const fields = 'campaign_id,campaign_name,impressions,clicks,spend,cpc,ctr,actions';
-    const path = `/${actId}/insights?fields=${fields}&level=campaign&time_increment=1&time_range={"since":"${startDate}","until":"${endDate}"}&limit=500`;
-
-    const response = await fbFetch<MetaInsightsResponse>(path, accessToken);
-    const rows = response.data || [];
-
-    // Fetch additional pages if available
-    let allRows = [...rows];
-    if (response.paging?.next) {
-      const moreRows = await fbFetchAll<MetaInsightRow>(
-        response.paging.next,
-        accessToken,
-        20
-      );
-      allRows = [...allRows, ...moreRows];
+    // Meta limits insights responses by cell count (rows × days × metrics).
+    // Split long ranges into 7-day chunks to avoid "reduce the amount of data" errors.
+    const chunks = chunkDateRange(startDate, endDate, 7);
+    const allRows: MetaInsightRow[] = [];
+    for (const chunk of chunks) {
+      const chunkRows = await fetchInsightsChunk(actId, accessToken, chunk.start, chunk.end);
+      allRows.push(...chunkRows);
     }
 
     let recordsSynced = 0;

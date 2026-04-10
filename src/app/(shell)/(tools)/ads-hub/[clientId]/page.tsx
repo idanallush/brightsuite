@@ -9,7 +9,7 @@ import { KpiCards } from '@/components/ads-hub/kpi-cards';
 import { PerformanceChart } from '@/components/ads-hub/performance-chart';
 import { CampaignTable } from '@/components/ads-hub/campaign-table';
 import { PlatformFilter } from '@/components/ads-hub/platform-filter';
-import { DateRangeFilter } from '@/components/ads-hub/date-range-filter';
+import { DateRangePicker } from '@/components/ads-hub/date-range-picker';
 
 export default function ClientDetailPage({ params }: { params: Promise<{ clientId: string }> }) {
   const { clientId } = use(params);
@@ -40,7 +40,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
         </div>
         <div className="flex items-center gap-3">
           <PlatformFilter />
-          <DateRangeFilter />
+          <DateRangePicker />
         </div>
       </div>
 
@@ -48,8 +48,10 @@ export default function ClientDetailPage({ params }: { params: Promise<{ clientI
       <KpiCards
         spend={Number(kpis?.total_spend || 0)}
         impressions={Number(kpis?.total_impressions || 0)}
+        clicks={Number(kpis?.total_clicks || 0)}
         conversions={Number(kpis?.total_conversions || 0)}
         cpl={kpis?.cpl ? Number(kpis.cpl) : null}
+        ctr={kpis?.ctr ? Number(kpis.ctr) : null}
         loading={clientLoading}
       />
 
