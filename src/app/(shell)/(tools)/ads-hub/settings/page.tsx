@@ -1,13 +1,12 @@
 'use client';
 
-import { usePlatformStatus, useSyncStatus } from '@/hooks/ads-hub/use-overview';
-import { SyncStatusCards } from '@/components/ads-hub/sync-status-cards';
+import { useSyncStatus } from '@/hooks/ads-hub/use-overview';
+import { PlatformConnections } from '@/components/ads-hub/platform-connections';
 import { SyncLogTable } from '@/components/ads-hub/sync-log-table';
 import { ClientManager } from '@/components/ads-hub/client-manager';
 import { BackfillForm } from '@/components/ads-hub/backfill-form';
 
 export default function AdsHubSettingsPage() {
-  const { data: platformData, isLoading: platformLoading } = usePlatformStatus();
   const { data: syncData, isLoading: syncLoading } = useSyncStatus(30);
 
   return (
@@ -16,15 +15,12 @@ export default function AdsHubSettingsPage() {
         הגדרות Ads Hub
       </h2>
 
-      {/* Connection Status */}
+      {/* Unified Platform Connections */}
       <section className="space-y-3">
         <h3 className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
-          סטטוס חיבור
+          חיבורי פלטפורמות
         </h3>
-        <SyncStatusCards
-          platforms={platformData?.platforms || []}
-          loading={platformLoading}
-        />
+        <PlatformConnections />
       </section>
 
       {/* Client Management */}

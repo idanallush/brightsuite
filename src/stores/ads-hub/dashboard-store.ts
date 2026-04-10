@@ -5,8 +5,10 @@ interface DashboardState {
   startDate: string;
   endDate: string;
   platform: string | null; // null = all platforms
+  selectedClientId: number | null; // null = all clients aggregated
   setDateRange: (start: string, end: string) => void;
   setPlatform: (platform: string | null) => void;
+  setSelectedClient: (id: number | null) => void;
 }
 
 function getMonthStart(): string {
@@ -24,8 +26,10 @@ export const useDashboardStore = create<DashboardState>()(
       startDate: getMonthStart(),
       endDate: getToday(),
       platform: null,
+      selectedClientId: null,
       setDateRange: (start, end) => set({ startDate: start, endDate: end }),
       setPlatform: (platform) => set({ platform }),
+      setSelectedClient: (id) => set({ selectedClientId: id }),
     }),
     {
       name: 'ads-hub-dashboard',
