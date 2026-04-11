@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json();
-  const { name, slug, metaAccountId, googleCustomerId, googleMccId, ga4PropertyId, currency } = body;
+  const { name, slug, metaAccountId, googleCustomerId, googleMccId, ga4PropertyId, currency, metricType } = body;
 
   if (!name || !slug) {
     return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 });
@@ -53,8 +53,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await db.execute({
-      sql: `INSERT INTO ah_clients (name, slug, meta_account_id, google_customer_id, google_mcc_id, ga4_property_id, currency)
-            VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      sql: `INSERT INTO ah_clients (name, slug, meta_account_id, google_customer_id, google_mcc_id, ga4_property_id, currency, metric_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
       args: [
         name,
         slug,
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
         googleMccId?.replace(/-/g, '') || null,
         ga4PropertyId || null,
         currency || 'ILS',
+        metricType === 'ecommerce' ? 'ecommerce' : 'leads',
       ],
     });
 

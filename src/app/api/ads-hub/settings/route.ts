@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
-import { isGoogleAdsAvailable } from '@/lib/google/ads-api';
+import { isGoogleAdsAvailableAsync } from '@/lib/google/ads-api';
 import { isServiceAvailable as isMetaAvailable } from '@/lib/ads-hub/meta-ads-service';
-import { isServiceAvailable as isGa4Available } from '@/lib/ads-hub/ga4-service';
+import { isServiceAvailableAsync as isGa4AvailableAsync } from '@/lib/ads-hub/ga4-service';
 import type { PlatformConnectionStatus } from '@/lib/ads-hub/types';
 
 type Platform = 'google' | 'meta' | 'ga4';
@@ -65,7 +65,7 @@ export async function GET() {
   const google = await getPlatformQueryResult('google', 'google_customer_id');
   platforms.push({
     platform: 'google',
-    connected: isGoogleAdsAvailable(),
+    connected: await isGoogleAdsAvailableAsync(),
     ...google,
   });
 
@@ -79,7 +79,7 @@ export async function GET() {
   const ga4 = await getPlatformQueryResult('ga4', 'ga4_property_id');
   platforms.push({
     platform: 'ga4',
-    connected: isGa4Available(),
+    connected: await isGa4AvailableAsync(),
     ...ga4,
   });
 

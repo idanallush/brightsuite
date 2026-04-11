@@ -53,7 +53,7 @@ export async function runDailySync(): Promise<{
 
     // Google Ads
     if (client.google_customer_id) {
-      if (googleAdsService.isServiceAvailable()) {
+      if (await googleAdsService.isGoogleAdsAvailableAsync()) {
         const mccId = client.google_mcc_id || process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || '';
         const result = await googleAdsService.syncDailyMetrics(
           client.id,
@@ -113,7 +113,7 @@ export async function runDailySync(): Promise<{
 
     // GA4
     if (client.ga4_property_id) {
-      if (ga4Service.isServiceAvailable()) {
+      if (await ga4Service.isServiceAvailableAsync()) {
         const result = await ga4Service.syncDailyMetrics(
           client.id,
           client.ga4_property_id,

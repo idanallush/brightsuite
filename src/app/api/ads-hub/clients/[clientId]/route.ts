@@ -67,7 +67,7 @@ export async function PUT(
 
   const { clientId } = await params;
   const body = await request.json();
-  const { name, metaAccountId, googleCustomerId, googleMccId, ga4PropertyId, currency, isActive } = body;
+  const { name, metaAccountId, googleCustomerId, googleMccId, ga4PropertyId, currency, isActive, metricType } = body;
 
   const db = getTurso();
 
@@ -79,6 +79,7 @@ export async function PUT(
             google_mcc_id = COALESCE(?, google_mcc_id),
             ga4_property_id = COALESCE(?, ga4_property_id),
             currency = COALESCE(?, currency),
+            metric_type = COALESCE(?, metric_type),
             is_active = COALESCE(?, is_active),
             updated_at = datetime('now')
           WHERE id = ?`,
@@ -89,6 +90,7 @@ export async function PUT(
       googleMccId?.replace(/-/g, '') || null,
       ga4PropertyId || null,
       currency || null,
+      metricType === 'ecommerce' || metricType === 'leads' ? metricType : null,
       isActive !== undefined ? (isActive ? 1 : 0) : null,
       clientId,
     ],

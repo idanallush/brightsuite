@@ -1,15 +1,19 @@
 import { getTurso } from '@/lib/db/turso';
+import { getFreshGoogleAccessToken, getAnyGoogleConnection } from '@/lib/google/connection';
 import type { SyncResult } from './types';
 
 async function getGa4AccessToken(): Promise<string> {
-  // GA4 requires analytics.readonly scope — NEVER fall back to the Google Ads
-  // refresh token (it has adwords scope only, which returns 403 from GA4).
+  // Prefer DB-stored OAuth connection with analytics.readonly scope.
+  const dbToken = await getFreshGoogleAccessToken('analytics').catch(() => null);
+  if (dbToken) return dbToken;
+
+  // Legacy env var path (requires dedicated GA4 refresh token).
   const refreshToken = process.env.GA4_REFRESH_TOKEN;
   const clientId = process.env.GA4_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID;
   const clientSecret = process.env.GA4_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
 
   if (!refreshToken || !clientId || !clientSecret) {
-    throw new Error('GA4 credentials not configured (GA4_REFRESH_TOKEN required with analytics.readonly scope)');
+    throw new Error('GA4 not configured. Connect Google in Ads Hub settings.');
   }
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -43,12 +47,19 @@ interface GA4ReportResponse {
 }
 
 export function isServiceAvailable(): boolean {
+  // Sync check (env var only, legacy callers).
   const hasClient = !!(process.env.GA4_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID);
   const hasSecret = !!(process.env.GA4_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET);
-  // Only report available if a dedicated GA4 token exists — the Google Ads
-  // refresh token usually doesn't have the analytics.readonly scope.
   const hasToken = !!process.env.GA4_REFRESH_TOKEN;
   return hasClient && hasSecret && hasToken;
+}
+
+export async function isServiceAvailableAsync(): Promise<boolean> {
+  // Env var path
+  if (isServiceAvailable()) return true;
+  // DB-stored Google connection with analytics.readonly scope
+  const conn = await getAnyGoogleConnection();
+  return !!conn && conn.scopes.some((s) => s.includes('analytics.readonly'));
 }
 
 export async function syncDailyMetrics(

@@ -49,6 +49,20 @@ export async function initDatabase(): Promise<void> {
       updated_at TEXT DEFAULT (datetime('now'))
     );
 
+    CREATE TABLE IF NOT EXISTS bs_google_connections (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      created_by INTEGER REFERENCES bs_users(id),
+      google_user_id TEXT,
+      google_user_email TEXT,
+      refresh_token TEXT NOT NULL,
+      access_token TEXT,
+      token_expires_at TEXT,
+      scopes TEXT NOT NULL,
+      is_active INTEGER DEFAULT 1,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_bs_sessions_user ON bs_tool_permissions(user_id);
     CREATE INDEX IF NOT EXISTS idx_bs_audit_user ON bs_audit_log(user_id);
     CREATE INDEX IF NOT EXISTS idx_bs_audit_tool ON bs_audit_log(tool_slug);
@@ -64,6 +78,7 @@ export async function initDatabase(): Promise<void> {
       google_mcc_id TEXT,
       ga4_property_id TEXT,
       currency TEXT DEFAULT 'ILS',
+      metric_type TEXT DEFAULT 'leads' CHECK (metric_type IN ('leads', 'ecommerce')),
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -155,10 +170,21 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
   `);
 
-  // Bootstrap: if no admin exists yet, promote the earliest active user to admin.
-  // This covers the case where the workspace has users created before the
-  // "first user = admin" rule was added.
   const db = getTurso();
+
+  // Migration: add metric_type to ah_clients if missing (SQLite doesn't alter
+  // on CREATE TABLE IF NOT EXISTS, so we check pragma and ALTER manually).
+  const clientCols = await db.execute({ sql: `PRAGMA table_info(ah_clients)`, args: [] });
+  const hasMetricType = clientCols.rows.some((r) => r.name === 'metric_type');
+  if (!hasMetricType) {
+    await db.execute({
+      sql: `ALTER TABLE ah_clients ADD COLUMN metric_type TEXT DEFAULT 'leads'`,
+      args: [],
+    });
+    console.log('[DB] Added metric_type column to ah_clients');
+  }
+
+  // Bootstrap: if no admin exists yet, promote the earliest active user to admin.
   const adminCheck = await db.execute({
     sql: `SELECT COUNT(*) as count FROM bs_users WHERE role = 'admin' AND is_active = 1`,
     args: [],

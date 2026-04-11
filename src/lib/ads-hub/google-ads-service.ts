@@ -3,12 +3,15 @@ import {
   getGoogleAdsAccessToken,
   queryGoogleAds,
   isGoogleAdsAvailable,
+  isGoogleAdsAvailableAsync,
 } from '@/lib/google/ads-api';
 import type { SyncResult } from './types';
 
 export function isServiceAvailable(): boolean {
   return isGoogleAdsAvailable();
 }
+
+export { isGoogleAdsAvailableAsync };
 
 export async function syncDailyMetrics(
   clientId: number,

@@ -23,6 +23,7 @@ interface ClientFormData {
   googleCustomerId: string;
   googleMccId: string;
   ga4PropertyId: string;
+  metricType: 'leads' | 'ecommerce';
 }
 
 const emptyForm: ClientFormData = {
@@ -32,6 +33,7 @@ const emptyForm: ClientFormData = {
   googleCustomerId: '',
   googleMccId: '',
   ga4PropertyId: '',
+  metricType: 'leads',
 };
 
 export const ClientManager = () => {
@@ -39,7 +41,10 @@ export const ClientManager = () => {
   const { data, mutate } = useOverview(startDate, endDate);
   const clients = data?.clients || [];
 
-  const { data: sessionData } = useSWR<SessionResponse>('/api/auth/session', sessionFetcher);
+  const { data: sessionData } = useSWR<SessionResponse>('/api/auth/session', sessionFetcher, {
+    revalidateOnMount: true,
+    revalidateOnFocus: true,
+  });
   const isAdmin = sessionData?.user?.role === 'admin';
 
   const { accounts: fbAccounts, isLoading: fbLoading } = useFacebookAccounts();
@@ -88,6 +93,7 @@ export const ClientManager = () => {
       googleCustomerId: (client.google_customer_id as string) || '',
       googleMccId: (client.google_mcc_id as string) || '',
       ga4PropertyId: (client.ga4_property_id as string) || '',
+      metricType: ((client.metric_type as string) === 'ecommerce' ? 'ecommerce' : 'leads'),
     });
     setShowForm(false);
   };
@@ -334,6 +340,40 @@ export const ClientManager = () => {
           placeholder="123456789"
         />
       </div>
+
+      <div className="md:col-span-2">
+        <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>סוג מטריקות *</label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, metricType: 'leads' })}
+            className="text-sm px-3 py-2 rounded-lg border transition-colors"
+            style={{
+              background: form.metricType === 'leads' ? 'var(--accent-subtle)' : 'var(--glass-bg)',
+              borderColor: form.metricType === 'leads' ? 'var(--accent)' : 'var(--glass-border)',
+              color: 'var(--text-primary)',
+              fontWeight: form.metricType === 'leads' ? 600 : 400,
+            }}
+          >
+            לידים
+            <span className="block text-[11px] opacity-70 font-normal">הוצאה · לידים · CPL · CTR</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm({ ...form, metricType: 'ecommerce' })}
+            className="text-sm px-3 py-2 rounded-lg border transition-colors"
+            style={{
+              background: form.metricType === 'ecommerce' ? 'var(--accent-subtle)' : 'var(--glass-bg)',
+              borderColor: form.metricType === 'ecommerce' ? 'var(--accent)' : 'var(--glass-border)',
+              color: 'var(--text-primary)',
+              fontWeight: form.metricType === 'ecommerce' ? 600 : 400,
+            }}
+          >
+            איקומרס
+            <span className="block text-[11px] opacity-70 font-normal">הוצאה · רכישות · הכנסות · ROAS</span>
+          </button>
+        </div>
+      </div>
     </div>
   );
 
@@ -364,8 +404,7 @@ export const ClientManager = () => {
             setEditingId(null);
             setForm(emptyForm);
           }}
-          disabled={!isAdmin}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
           style={{ background: 'var(--accent)', color: '#1a1a1a' }}
         >
           <Plus size={16} />
@@ -373,8 +412,8 @@ export const ClientManager = () => {
         </button>
         <button
           onClick={handleManualSync}
-          disabled={syncing || !isAdmin}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={syncing}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
           style={{
             borderColor: 'var(--glass-border)',
             color: 'var(--text-secondary)',

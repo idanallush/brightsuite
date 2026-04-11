@@ -1,6 +1,8 @@
 // Shared Google Ads API utilities
 // Used by both BudgetFlow and Ads Hub
 
+import { getFreshGoogleAccessToken } from '@/lib/google/connection';
+
 const GOOGLE_ADS_API_VERSION = 'v23';
 
 interface GoogleTokenResponse {
@@ -10,13 +12,22 @@ interface GoogleTokenResponse {
 }
 
 export async function getGoogleAdsAccessToken(): Promise<string> {
+  // Prefer DB-stored OAuth connection over env var refresh token.
+  const dbToken = await getFreshGoogleAccessToken('adwords').catch(() => null);
+  if (dbToken) return dbToken;
+
+  // Legacy env-var fallback
+  if (!process.env.GOOGLE_ADS_REFRESH_TOKEN) {
+    throw new Error('No Google connection found. Connect Google in Ads Hub settings.');
+  }
+
   const res = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
       client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
       client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
+      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN,
       grant_type: 'refresh_token',
     }),
   });
@@ -69,10 +80,29 @@ export async function queryGoogleAds(
 }
 
 export function isGoogleAdsAvailable(): boolean {
+  // Legacy sync check based only on env vars (for backwards compat).
+  // New callers should use isGoogleAdsAvailableAsync which also checks the DB.
   return !!(
     process.env.GOOGLE_ADS_CLIENT_ID &&
     process.env.GOOGLE_ADS_CLIENT_SECRET &&
     process.env.GOOGLE_ADS_DEVELOPER_TOKEN &&
     process.env.GOOGLE_ADS_REFRESH_TOKEN
   );
+}
+
+export async function isGoogleAdsAvailableAsync(): Promise<boolean> {
+  // Ads API always needs client ID/secret + developer token as env vars.
+  const hasBaseConfig = !!(
+    process.env.GOOGLE_ADS_CLIENT_ID &&
+    process.env.GOOGLE_ADS_CLIENT_SECRET &&
+    process.env.GOOGLE_ADS_DEVELOPER_TOKEN
+  );
+  if (!hasBaseConfig) return false;
+
+  // Refresh token can come from env var OR DB-stored OAuth connection.
+  if (process.env.GOOGLE_ADS_REFRESH_TOKEN) return true;
+
+  const { getAnyGoogleConnection } = await import('@/lib/google/connection');
+  const conn = await getAnyGoogleConnection();
+  return !!conn && conn.scopes.some((s) => s.includes('adwords'));
 }
