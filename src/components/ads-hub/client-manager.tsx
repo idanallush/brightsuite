@@ -1,12 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, RefreshCw, ChevronDown, Loader2, Pencil, Trash2, X, Check } from 'lucide-react';
+import useSWR from 'swr';
+import { Plus, RefreshCw, ChevronDown, Loader2, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react';
 import { useOverview } from '@/hooks/ads-hub/use-overview';
 import { useFacebookAccounts } from '@/hooks/ads-hub/use-facebook-accounts';
 import { useGoogleAccounts } from '@/hooks/ads-hub/use-google-accounts';
 import { toast } from 'sonner';
 import { useDashboardStore } from '@/stores/ads-hub/dashboard-store';
+
+interface SessionResponse {
+  authenticated: boolean;
+  user?: { role: 'admin' | 'manager' | 'viewer' };
+}
+
+const sessionFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface ClientFormData {
   name: string;
@@ -30,6 +38,9 @@ export const ClientManager = () => {
   const { startDate, endDate } = useDashboardStore();
   const { data, mutate } = useOverview(startDate, endDate);
   const clients = data?.clients || [];
+
+  const { data: sessionData } = useSWR<SessionResponse>('/api/auth/session', sessionFetcher);
+  const isAdmin = sessionData?.user?.role === 'admin';
 
   const { accounts: fbAccounts, isLoading: fbLoading } = useFacebookAccounts();
   const { accounts: googleAccounts, mccId: googleMccId, isLoading: googleLoading } = useGoogleAccounts();
@@ -328,6 +339,23 @@ export const ClientManager = () => {
 
   return (
     <div className="space-y-4">
+      {/* Role warning for non-admins */}
+      {sessionData && !isAdmin && (
+        <div
+          className="flex items-start gap-2 rounded-lg p-3 text-xs"
+          style={{ background: '#fef6e0', border: '1px solid #f5e4b0', color: '#b45309' }}
+        >
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <div>
+            <p className="font-medium">נדרשת הרשאת אדמין</p>
+            <p className="mt-0.5 opacity-80">
+              המשתמש הנוכחי הוא {sessionData.user?.role}. יצירה, עריכה, מחיקה וסנכרון של לקוחות דורשים הרשאת admin.
+              צא והיכנס מחדש כדי לרענן את ההרשאות.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Actions */}
       <div className="flex gap-2">
         <button
@@ -336,7 +364,8 @@ export const ClientManager = () => {
             setEditingId(null);
             setForm(emptyForm);
           }}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
+          disabled={!isAdmin}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           style={{ background: 'var(--accent)', color: '#1a1a1a' }}
         >
           <Plus size={16} />
@@ -344,8 +373,8 @@ export const ClientManager = () => {
         </button>
         <button
           onClick={handleManualSync}
-          disabled={syncing}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors"
+          disabled={syncing || !isAdmin}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             borderColor: 'var(--glass-border)',
             color: 'var(--text-secondary)',

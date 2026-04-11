@@ -6,82 +6,81 @@ import { isServiceAvailable as isMetaAvailable } from '@/lib/ads-hub/meta-ads-se
 import { isServiceAvailable as isGa4Available } from '@/lib/ads-hub/ga4-service';
 import type { PlatformConnectionStatus } from '@/lib/ads-hub/types';
 
+type Platform = 'google' | 'meta' | 'ga4';
+
+interface PlatformQueryResult {
+  lastSync: string | null;
+  accountCount: number;
+  lastError: string | null;
+}
+
+// Returns platform status where `lastError` is cleared once a newer successful
+// sync exists — so stale failures don't stick around after recovery.
+async function getPlatformQueryResult(
+  platform: Platform,
+  accountField: string
+): Promise<PlatformQueryResult> {
+  const db = getTurso();
+
+  const lastSyncResult = await db.execute({
+    sql: `SELECT started_at FROM ah_sync_log
+          WHERE platform = ? AND status = 'success'
+          ORDER BY started_at DESC LIMIT 1`,
+    args: [platform],
+  });
+  const lastSync = (lastSyncResult.rows[0]?.started_at as string) || null;
+
+  const lastErrorResult = await db.execute({
+    sql: `SELECT started_at, error_message FROM ah_sync_log
+          WHERE platform = ? AND status = 'error'
+          ORDER BY started_at DESC LIMIT 1`,
+    args: [platform],
+  });
+  const errorStartedAt = (lastErrorResult.rows[0]?.started_at as string) || null;
+  const errorMessage = (lastErrorResult.rows[0]?.error_message as string) || null;
+
+  // Only surface the error if it's newer than the last successful sync.
+  const lastError =
+    errorMessage && (!lastSync || (errorStartedAt && errorStartedAt > lastSync))
+      ? errorMessage
+      : null;
+
+  const accountsResult = await db.execute({
+    sql: `SELECT COUNT(*) as count FROM ah_clients
+          WHERE ${accountField} IS NOT NULL AND is_active = 1`,
+    args: [],
+  });
+  const accountCount = Number(accountsResult.rows[0]?.count || 0);
+
+  return { lastSync, accountCount, lastError };
+}
+
 // GET /api/ads-hub/settings — connection status per platform
 export async function GET() {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
 
-  const db = getTurso();
-
   const platforms: PlatformConnectionStatus[] = [];
 
-  // Google Ads
-  const googleConnected = isGoogleAdsAvailable();
-  const googleLastSync = await db.execute({
-    sql: `SELECT started_at, error_message FROM ah_sync_log WHERE platform = 'google' AND status = 'success' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-  const googleAccounts = await db.execute({
-    sql: `SELECT COUNT(*) as count FROM ah_clients WHERE google_customer_id IS NOT NULL AND is_active = 1`,
-    args: [],
-  });
-  const googleLastError = await db.execute({
-    sql: `SELECT error_message FROM ah_sync_log WHERE platform = 'google' AND status = 'error' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-
+  const google = await getPlatformQueryResult('google', 'google_customer_id');
   platforms.push({
     platform: 'google',
-    connected: googleConnected,
-    lastSync: (googleLastSync.rows[0]?.started_at as string) || null,
-    accountCount: Number(googleAccounts.rows[0]?.count || 0),
-    lastError: (googleLastError.rows[0]?.error_message as string) || null,
+    connected: isGoogleAdsAvailable(),
+    ...google,
   });
 
-  // Meta
-  const metaConnected = await isMetaAvailable();
-  const metaLastSync = await db.execute({
-    sql: `SELECT started_at FROM ah_sync_log WHERE platform = 'meta' AND status = 'success' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-  const metaAccounts = await db.execute({
-    sql: `SELECT COUNT(*) as count FROM ah_clients WHERE meta_account_id IS NOT NULL AND is_active = 1`,
-    args: [],
-  });
-  const metaLastError = await db.execute({
-    sql: `SELECT error_message FROM ah_sync_log WHERE platform = 'meta' AND status = 'error' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-
+  const meta = await getPlatformQueryResult('meta', 'meta_account_id');
   platforms.push({
     platform: 'meta',
-    connected: metaConnected,
-    lastSync: (metaLastSync.rows[0]?.started_at as string) || null,
-    accountCount: Number(metaAccounts.rows[0]?.count || 0),
-    lastError: (metaLastError.rows[0]?.error_message as string) || null,
+    connected: await isMetaAvailable(),
+    ...meta,
   });
 
-  // GA4
-  const ga4Connected = isGa4Available();
-  const ga4LastSync = await db.execute({
-    sql: `SELECT started_at FROM ah_sync_log WHERE platform = 'ga4' AND status = 'success' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-  const ga4Accounts = await db.execute({
-    sql: `SELECT COUNT(*) as count FROM ah_clients WHERE ga4_property_id IS NOT NULL AND is_active = 1`,
-    args: [],
-  });
-  const ga4LastError = await db.execute({
-    sql: `SELECT error_message FROM ah_sync_log WHERE platform = 'ga4' AND status = 'error' ORDER BY started_at DESC LIMIT 1`,
-    args: [],
-  });
-
+  const ga4 = await getPlatformQueryResult('ga4', 'ga4_property_id');
   platforms.push({
     platform: 'ga4',
-    connected: ga4Connected,
-    lastSync: (ga4LastSync.rows[0]?.started_at as string) || null,
-    accountCount: Number(ga4Accounts.rows[0]?.count || 0),
-    lastError: (ga4LastError.rows[0]?.error_message as string) || null,
+    connected: isGa4Available(),
+    ...ga4,
   });
 
   return NextResponse.json({ platforms });

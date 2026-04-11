@@ -19,6 +19,21 @@ function getYesterday(): string {
   return d.toISOString().split('T')[0];
 }
 
+async function logSkipped(
+  clientId: number,
+  platform: Platform,
+  status: 'skipped' | 'error',
+  message: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  const db = getTurso();
+  await db.execute({
+    sql: `INSERT INTO ah_sync_log (client_id, platform, sync_type, status, records_synced, error_message, started_at, completed_at)
+          VALUES (?, ?, 'daily', ?, 0, ?, ?, ?)`,
+    args: [clientId, platform, status, message, now, now],
+  });
+}
+
 export async function runDailySync(): Promise<{
   clients: number;
   results: Array<{ clientName: string; syncs: SyncResult[] }>;
@@ -49,7 +64,9 @@ export async function runDailySync(): Promise<{
         );
         syncs.push(result);
       } else {
-        syncs.push({ platform: 'google', status: 'skipped', recordsSynced: 0, error: 'Google Ads not configured (missing env vars)' });
+        const msg = 'Google Ads not configured (missing env vars)';
+        await logSkipped(client.id, 'google', 'skipped', msg);
+        syncs.push({ platform: 'google', status: 'skipped', recordsSynced: 0, error: msg });
       }
     }
 
@@ -57,11 +74,15 @@ export async function runDailySync(): Promise<{
     if (client.meta_account_id) {
       const metaAvailable = await metaAdsService.isServiceAvailable();
       if (!metaAvailable) {
-        syncs.push({ platform: 'meta', status: 'skipped', recordsSynced: 0, error: 'No active Facebook connection' });
+        const msg = 'No active Facebook connection';
+        await logSkipped(client.id, 'meta', 'skipped', msg);
+        syncs.push({ platform: 'meta', status: 'skipped', recordsSynced: 0, error: msg });
       } else {
         const accessToken = await metaAdsService.getActiveAccessToken();
         if (!accessToken) {
-          syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: 'Facebook access token not found' });
+          const msg = 'Facebook access token not found';
+          await logSkipped(client.id, 'meta', 'error', msg);
+          syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: msg });
         } else {
           const result = await metaAdsService.syncDailyMetrics(
             client.id,
@@ -72,16 +93,19 @@ export async function runDailySync(): Promise<{
           );
           syncs.push(result);
 
-          // Discover new video ads (don't fail the whole sync if this errors)
-          try {
-            const videoResult = await metaAdsService.discoverVideoAds(
-              client.id,
-              client.meta_account_id,
-              accessToken
-            );
-            syncs.push(videoResult);
-          } catch {
-            syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: 'Video discovery failed' });
+          // Discover new video ads (don't fail the whole sync if this errors).
+          // Gated by env var so we can disable it if Meta API keeps rejecting.
+          if (process.env.ADS_HUB_DISABLE_VIDEO_DISCOVERY !== '1') {
+            try {
+              const videoResult = await metaAdsService.discoverVideoAds(
+                client.id,
+                client.meta_account_id,
+                accessToken
+              );
+              syncs.push(videoResult);
+            } catch {
+              syncs.push({ platform: 'meta', status: 'error', recordsSynced: 0, error: 'Video discovery failed' });
+            }
           }
         }
       }
@@ -98,7 +122,9 @@ export async function runDailySync(): Promise<{
         );
         syncs.push(result);
       } else {
-        syncs.push({ platform: 'ga4', status: 'skipped', recordsSynced: 0, error: 'GA4 not configured (missing env vars)' });
+        const msg = 'GA4 not configured (GA4_REFRESH_TOKEN missing)';
+        await logSkipped(client.id, 'ga4', 'skipped', msg);
+        syncs.push({ platform: 'ga4', status: 'skipped', recordsSynced: 0, error: msg });
       }
     }
 

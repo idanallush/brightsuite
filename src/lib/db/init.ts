@@ -155,5 +155,23 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
   `);
 
+  // Bootstrap: if no admin exists yet, promote the earliest active user to admin.
+  // This covers the case where the workspace has users created before the
+  // "first user = admin" rule was added.
+  const db = getTurso();
+  const adminCheck = await db.execute({
+    sql: `SELECT COUNT(*) as count FROM bs_users WHERE role = 'admin' AND is_active = 1`,
+    args: [],
+  });
+  if (Number(adminCheck.rows[0]?.count ?? 0) === 0) {
+    await db.execute({
+      sql: `UPDATE bs_users
+            SET role = 'admin', updated_at = datetime('now')
+            WHERE id = (SELECT id FROM bs_users WHERE is_active = 1 ORDER BY created_at ASC LIMIT 1)`,
+      args: [],
+    });
+    console.log('[DB] Bootstrapped first user to admin role');
+  }
+
   console.log('[DB] All tables and indexes created successfully');
 }

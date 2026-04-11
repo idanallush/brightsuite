@@ -51,17 +51,24 @@ export async function GET(request: NextRequest) {
     let avatarUrl: string | null;
 
     if (userResult.rows.length === 0) {
-      // New user — auto-create with viewer role
+      // First user in the workspace becomes admin; subsequent users default to viewer.
+      const countResult = await db.execute({
+        sql: 'SELECT COUNT(*) as count FROM bs_users WHERE is_active = 1',
+        args: [],
+      });
+      const isFirstUser = Number(countResult.rows[0]?.count ?? 0) === 0;
+      const newRole: SessionData['role'] = isFirstUser ? 'admin' : 'viewer';
+
       const insertResult = await db.execute({
         sql: `INSERT INTO bs_users (email, name, password_hash, role, google_id, avatar_url, is_active, created_at, updated_at)
-              VALUES (?, ?, NULL, 'viewer', ?, ?, 1, datetime('now'), datetime('now'))`,
-        args: [googleUser.email, googleUser.name, googleUser.sub, googleUser.picture || null],
+              VALUES (?, ?, NULL, ?, ?, ?, 1, datetime('now'), datetime('now'))`,
+        args: [googleUser.email, googleUser.name, newRole, googleUser.sub, googleUser.picture || null],
       });
 
       userId = Number(insertResult.lastInsertRowid);
       userName = googleUser.name;
       userEmail = googleUser.email;
-      userRole = 'viewer';
+      userRole = newRole;
       avatarUrl = googleUser.picture || null;
     } else {
       const user = userResult.rows[0];

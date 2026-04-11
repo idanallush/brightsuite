@@ -2,15 +2,14 @@ import { getTurso } from '@/lib/db/turso';
 import type { SyncResult } from './types';
 
 async function getGa4AccessToken(): Promise<string> {
-  // GA4 requires analytics.readonly scope, which is different from Google Ads scope.
-  // Prefer a dedicated GA4 refresh token if provided; otherwise fall back to the
-  // Google Ads token (works only if that token was created with both scopes).
-  const refreshToken = process.env.GA4_REFRESH_TOKEN || process.env.GOOGLE_ADS_REFRESH_TOKEN;
+  // GA4 requires analytics.readonly scope — NEVER fall back to the Google Ads
+  // refresh token (it has adwords scope only, which returns 403 from GA4).
+  const refreshToken = process.env.GA4_REFRESH_TOKEN;
   const clientId = process.env.GA4_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID;
   const clientSecret = process.env.GA4_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
 
   if (!refreshToken || !clientId || !clientSecret) {
-    throw new Error('GA4 credentials not configured');
+    throw new Error('GA4 credentials not configured (GA4_REFRESH_TOKEN required with analytics.readonly scope)');
   }
 
   const res = await fetch('https://oauth2.googleapis.com/token', {

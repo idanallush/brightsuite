@@ -27,11 +27,8 @@ interface MetaAdCreative {
   campaign_id: string;
   creative?: {
     id: string;
+    video_id?: string;
     thumbnail_url?: string;
-    object_story_spec?: {
-      video_data?: { video_id?: string };
-      [key: string]: unknown;
-    };
   };
 }
 
@@ -200,14 +197,17 @@ export async function discoverVideoAds(
   const actId = ensureActPrefix(accountId);
 
   try {
-    const fields = 'id,name,campaign_id,creative{id,thumbnail_url,object_story_spec}';
-    const path = `/${actId}/ads?fields=${fields}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE","PAUSED"]}]&limit=500`;
+    // Request the minimum fields needed. `creative{video_id}` is a direct subfield
+    // on AdCreative in v23+ — much cheaper than expanding object_story_spec.
+    // Keep the page limit low to avoid Meta's "reduce the amount of data" error.
+    const fields = 'id,name,campaign_id,creative{id,video_id,thumbnail_url}';
+    const path = `/${actId}/ads?fields=${fields}&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=50`;
 
-    const ads = await fbFetchAll<MetaAdCreative>(path, accessToken, 10);
+    const ads = await fbFetchAll<MetaAdCreative>(path, accessToken, 5);
     let recordsSynced = 0;
 
     for (const ad of ads) {
-      const videoId = ad.creative?.object_story_spec?.video_data?.video_id;
+      const videoId = ad.creative?.video_id;
       if (!videoId) continue;
 
       const utm = generateUtm(ad.campaign_id || 'unknown', ad.name || ad.id);
