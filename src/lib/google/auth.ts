@@ -1,12 +1,14 @@
-const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
-const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
 
 function requireGoogleCredentials() {
-  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
-    throw new Error('Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET environment variables');
+  const clientId = process.env.GOOGLE_CLIENT_ID || process.env.GOOGLE_ADS_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || process.env.GOOGLE_ADS_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error(
+      'Missing Google OAuth credentials — set GOOGLE_CLIENT_ID/SECRET (or GOOGLE_ADS_CLIENT_ID/SECRET as fallback)',
+    );
   }
-  return { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET };
+  return { clientId, clientSecret };
 }
 
 export function getGoogleLoginUrl(csrfState: string): string {
