@@ -14,12 +14,6 @@ import {
   Pencil,
   Archive,
   X,
-  Cog,
-  Database,
-  Server,
-  Lock,
-  Cloud,
-  Code2,
 } from 'lucide-react';
 
 // =====================================================
@@ -59,7 +53,7 @@ type ForecastState = {
   raisePct: number;
 };
 
-type Tab = 'overview' | 'clients' | 'team' | 'expenses' | 'forecast' | 'system';
+type Tab = 'overview' | 'clients' | 'team' | 'expenses' | 'forecast';
 
 type DataPayload = {
   clients: Client[];
@@ -393,7 +387,6 @@ export default function PpcRetainerPage() {
     { id: 'team', label: 'צוות', icon: UserCog, badge: team.length },
     { id: 'expenses', label: 'הוצאות קבועות', icon: Receipt },
     { id: 'forecast', label: 'תכנון עתיד', icon: TrendingUp },
-    { id: 'system', label: 'מערכת', icon: Cog },
   ];
 
   if (error) {
@@ -498,17 +491,6 @@ export default function PpcRetainerPage() {
           expenses={expenses}
           onAdd={handleAddExpense}
           onDelete={handleDeleteExpense}
-        />
-      )}
-
-      {tab === 'system' && (
-        <System
-          counts={{
-            clients: clients.length,
-            activeClients: activeClients.length,
-            team: team.length,
-            expenses: expenses.length,
-          }}
         />
       )}
 
@@ -1384,160 +1366,6 @@ function Forecast({
             </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// =====================================================
-// System (read-only stack info)
-// =====================================================
-function System({
-  counts,
-}: {
-  counts: { clients: number; activeClients: number; team: number; expenses: number };
-}) {
-  return (
-    <div>
-      <h2 className="ppcr-view__title">מערכת ותשתית</h2>
-      <p className="ppcr-view__lede">
-        סקירת ה-stack של הכלי, מקורות הדאטה, מבנה ה-DB וה-API endpoints. תצוגה בלבד — לא ניתן
-        לערוך מכאן.
-      </p>
-
-      <div className="ppcr-sys-grid">
-        <SysCard icon={<Code2 size={18} />} title="Frontend">
-          <SysRow k="Framework" v="Next.js 16.2 (App Router · Turbopack)" />
-          <SysRow k="Runtime" v="React 19" />
-          <SysRow k="Styling" v="Tailwind CSS v4 + scoped styles.css" />
-          <SysRow k="Data fetching" v="SWR (revalidate-on-focus, optimistic updates)" />
-          <SysRow k="Icons" v="lucide-react" />
-          <SysRow k="Page" v={<code>src/app/(shell)/(tools)/ppc-retainer/page.tsx</code>} />
-        </SysCard>
-
-        <SysCard icon={<Database size={18} />} title="Database">
-          <SysRow k="Provider" v="Turso (libSQL · serverless SQLite)" />
-          <SysRow k="Client" v="@libsql/client (raw SQL, no ORM)" />
-          <SysRow k="Init" v={<code>src/lib/db/init.ts</code>} />
-          <SysRow k="Connection" v={<code>src/lib/db/turso.ts (INIT_VERSION = 4)</code>} />
-          <SysRow k="Tables" v={`pr_clients · pr_team · pr_expenses · pr_forecast`} />
-        </SysCard>
-
-        <SysCard icon={<Server size={18} />} title="API">
-          <SysRow k="GET" v={<code>/api/ppc-retainer/data</code>} hint="כל הנתונים בקריאה אחת" />
-          <SysRow k="POST" v={<code>/api/ppc-retainer/clients</code>} hint="יצירת לקוח" />
-          <SysRow k="PUT/DELETE" v={<code>/api/ppc-retainer/clients/[id]</code>} hint="עדכון / מחיקה / ארכיון" />
-          <SysRow k="POST" v={<code>/api/ppc-retainer/expenses</code>} hint="הוצאה חדשה" />
-          <SysRow k="PUT/DELETE" v={<code>/api/ppc-retainer/expenses/[id]</code>} />
-          <SysRow k="PUT" v={<code>/api/ppc-retainer/team/[id]</code>} hint="הכנסות / עלות מעביד" />
-          <SysRow k="PUT" v={<code>/api/ppc-retainer/forecast</code>} hint="upsert של תרחיש (debounced 350ms)" />
-        </SysCard>
-
-        <SysCard icon={<Lock size={18} />} title="Authentication">
-          <SysRow k="Sessions" v="iron-session (encrypted cookies)" />
-          <SysRow k="Login" v="Google OAuth 2.0" />
-          <SysRow k="Auth check" v={<code>requirePpcAuth()</code>} hint="בכל route — מחזיר 401 ללא session" />
-          <SysRow k="Tool slug" v={<code>ppc-retainer</code>} hint="admin אוטומטית · אחרים דורשים הרשאה" />
-        </SysCard>
-
-        <SysCard icon={<Cloud size={18} />} title="Hosting & Deploy">
-          <SysRow k="Platform" v="Vercel (Edge functions · serverless)" />
-          <SysRow k="CI/CD" v="git push origin main → auto deploy" />
-          <SysRow k="Repo" v="github.com/idanallush/brightsuite" />
-          <SysRow k="Env vars" v="TURSO_DATABASE_URL · TURSO_AUTH_TOKEN · GOOGLE_CLIENT_ID/SECRET · SESSION_PASSWORD" />
-        </SysCard>
-
-        <SysCard icon={<CircleDot size={18} />} title="Data Snapshot">
-          <SysRow k="לקוחות במערכת" v={`${counts.clients} (${counts.activeClients} פעילים)`} />
-          <SysRow k="אנשי צוות" v={String(counts.team)} />
-          <SysRow k="הוצאות קבועות" v={String(counts.expenses)} />
-          <SysRow k="Seed initial" v="22 לקוחות · 4 צוות · 17 הוצאות (חד פעמי על DB ריק)" />
-        </SysCard>
-      </div>
-
-      <div className="ppcr-card" style={{ marginTop: 18 }}>
-        <div className="ppcr-card__header">
-          <h3>סכמת בסיס הנתונים</h3>
-          <span className="ppcr-card__hint">SQLite · prefix pr_</span>
-        </div>
-        <pre className="ppcr-sys-schema">
-{`pr_clients (
-  id            INTEGER PK AUTOINCREMENT
-  name          TEXT
-  retainer      REAL
-  manager       TEXT
-  platforms     TEXT (JSON array)
-  meta          INTEGER
-  google        INTEGER
-  status        TEXT  -- 'active' | 'archived'
-  created_at    TEXT
-  updated_at    TEXT
-)
-
-pr_team (
-  id            INTEGER PK AUTOINCREMENT
-  name          TEXT UNIQUE
-  revenue       REAL
-  employer_cost REAL
-  sort_order    INTEGER
-)
-
-pr_expenses (
-  id            INTEGER PK AUTOINCREMENT
-  name          TEXT
-  amount        REAL
-  note          TEXT
-  category      TEXT
-)
-
-pr_forecast (
-  id            INTEGER PK CHECK (id = 1)  -- singleton
-  new_monthly   REAL
-  churn_monthly REAL
-  raise_pct     REAL
-  updated_at    TEXT
-)`}
-        </pre>
-      </div>
-    </div>
-  );
-}
-
-function SysCard({
-  icon,
-  title,
-  children,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="ppcr-card ppcr-sys-card">
-      <div className="ppcr-sys-card__head">
-        <span className="ppcr-sys-card__icon">{icon}</span>
-        <h3>{title}</h3>
-      </div>
-      <div className="ppcr-sys-card__body">{children}</div>
-    </div>
-  );
-}
-
-function SysRow({
-  k,
-  v,
-  hint,
-}: {
-  k: string;
-  v: React.ReactNode;
-  hint?: string;
-}) {
-  return (
-    <div className="ppcr-sys-row">
-      <div className="ppcr-sys-row__k">{k}</div>
-      <div className="ppcr-sys-row__v">
-        {v}
-        {hint && <div className="ppcr-sys-row__hint">{hint}</div>}
       </div>
     </div>
   );

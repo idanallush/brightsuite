@@ -486,3 +486,31 @@ body {
 .text-text-primary { color: var(--text-primary) !important; }
 .text-text-secondary { color: var(--text-secondary) !important; }
 .text-text-muted { color: var(--text-muted) !important; }
+
+/* =============================================
+   System info page (settings/system) — read-only
+   ============================================= */
+.sys-code {
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 11.5px;
+  background: var(--card-bg-active);
+  color: var(--text-primary);
+  padding: 2px 7px;
+  border-radius: 5px;
+  border: 1px solid var(--card-border);
+  direction: ltr;
+  white-space: nowrap;
+}
+.sys-tree {
+  margin: 0;
+  padding: 20px 24px;
+  background: #1a1a1a;
+  color: #e6e6e6;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-x: auto;
+  direction: ltr;
+  text-align: start;
+  white-space: pre;
+}
