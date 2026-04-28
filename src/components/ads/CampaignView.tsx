@@ -3,7 +3,7 @@
 import { useState, useMemo } from "react";
 import useSWR from "swr";
 
-import { ChevronDown, Megaphone, Target, CheckSquare, Square } from "lucide-react";
+import { ChevronDown, Megaphone, Target, CheckSquare, Square, FolderPlus } from "lucide-react";
 import { Badge } from "@/components/cpa/ui/badge";
 import { Button } from "@/components/cpa/ui/button";
 import { AdCard } from "./AdCard";
@@ -49,6 +49,7 @@ interface CampaignViewProps {
   selectedAdIds?: Set<string>;
   onToggleAd?: (adId: string) => void;
   summaryGroups?: SummaryGroup[];
+  onAddCampaignToGroup?: (campaignId: string, campaignName: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -109,6 +110,7 @@ function CampaignHeader({
   selectedAdIds,
   onToggleAd,
   campaignInsights,
+  onAddCampaignToGroup,
 }: {
   group: CampaignGroup;
   isOpen: boolean;
@@ -118,6 +120,7 @@ function CampaignHeader({
   selectedAdIds?: Set<string>;
   onToggleAd?: (adId: string) => void;
   campaignInsights?: ParsedMetrics | null;
+  onAddCampaignToGroup?: (campaignId: string, campaignName: string) => void;
 }) {
   const summaryConfig = METRIC_PRESETS[activePreset].campaignSummary;
 
@@ -263,6 +266,21 @@ function CampaignHeader({
           )}
         </Button>
       )}
+
+      {isOpen && onAddCampaignToGroup && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="min-w-[44px] min-h-[44px] p-0 shrink-0"
+          onClick={(e) => {
+            e.stopPropagation();
+            onAddCampaignToGroup(group.campaignId, group.campaignName);
+          }}
+          title="הוסף קמפיין כקבוצה"
+        >
+          <FolderPlus className="h-4 w-4 text-blue-500" />
+        </Button>
+      )}
     </div>
   );
 }
@@ -270,7 +288,7 @@ function CampaignHeader({
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export function CampaignView({ ads, selectedMetrics, presetMetrics, activePreset = DEFAULT_PRESET, loading, accountName, dateRange, currency = "USD", accountId, selectedAdIds, onToggleAd, summaryGroups }: CampaignViewProps) {
+export function CampaignView({ ads, selectedMetrics, presetMetrics, activePreset = DEFAULT_PRESET, loading, accountName, dateRange, currency = "USD", accountId, selectedAdIds, onToggleAd, summaryGroups, onAddCampaignToGroup }: CampaignViewProps) {
   const [openCampaigns, setOpenCampaigns] = useState<Set<string>>(new Set());
 
   const campaigns = useMemo(() => groupByCampaign(ads), [ads]);
@@ -354,6 +372,7 @@ export function CampaignView({ ads, selectedMetrics, presetMetrics, activePreset
               selectedAdIds={selectedAdIds}
               onToggleAd={onToggleAd}
               campaignInsights={campaignInsightsMap?.[group.campaignId]}
+              onAddCampaignToGroup={onAddCampaignToGroup}
             />
 
             {isOpen && group.ads.length > 0 && (

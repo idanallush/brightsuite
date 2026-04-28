@@ -467,6 +467,18 @@ function AdLibraryContent() {
     activeTab === "ads" || activeTab === "campaigns",
   );
 
+  const addCampaignToGroup = useCallback((campaignId: string, campaignName: string) => {
+    const campaignAdsForGroup = rawAds.filter((ad) => ad.campaignId === campaignId);
+    if (campaignAdsForGroup.length === 0) {
+      toast.info("אין מודעות בקמפיין זה");
+      return;
+    }
+    const label = getNextGroupLabel();
+    const adIds = new Set(campaignAdsForGroup.map((ad) => ad.adId));
+    setSummaryGroups((prev) => [...prev, { label, adIds }]);
+    toast.success(`קמפיין "${campaignName}" נוסף כקבוצה ${label}`);
+  }, [rawAds, getNextGroupLabel]);
+
   const handleGroupedSummaryExport = useCallback(async () => {
     if (summaryGroups.length === 0) return;
     setIsSummaryExporting(true);
@@ -1045,6 +1057,7 @@ function AdLibraryContent() {
               selectedAdIds={selectedAdIds}
               onToggleAd={toggleAdSelection}
               summaryGroups={summaryGroups}
+              onAddCampaignToGroup={addCampaignToGroup}
             />
           </TabsContent>
         </>

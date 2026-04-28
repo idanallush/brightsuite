@@ -3,6 +3,7 @@ import { getBrowser } from "./browser";
 import { buildClientHtml } from "./html-client-template";
 import { buildQuickHtml } from "./html-quick-template";
 import { buildSummaryHtml, buildGroupedSummaryHtml } from "./html-summary-template";
+import { buildCatalogHtml } from "./html-catalog-template";
 
 // ---------------------------------------------------------------------------
 // Image optimization — resize with sharp before base64 encoding
@@ -435,5 +436,44 @@ export async function generateClientPdf(options: GeneratePdfOptions): Promise<Bu
 
   const result = await htmlToPdf(html, { landscape: true, fullPage: true });
   console.log(`[PDF] generateClientPdf complete in ${Date.now() - totalStart}ms`);
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Catalog PDF — compact table/grid showing many ads per page
+// ---------------------------------------------------------------------------
+export interface GenerateCatalogPdfOptions {
+  ads: AdCreativeRow[];
+  accountName: string;
+  dateRange: { since: string; until: string };
+  currency?: string;
+}
+
+export async function generateCatalogPdf(options: GenerateCatalogPdfOptions): Promise<Buffer> {
+  const totalStart = Date.now();
+  console.log(`[PDF] generateCatalogPdf: ${options.ads.length} ads`);
+
+  const validAds = cleanAdsData(options.ads);
+  console.log(`[PDF] Cleaned ads: ${validAds.length} valid`);
+
+  const mediaImages = await fetchAllMedia(validAds);
+  const logoBase64 = loadLogo();
+  const fontBase64 = loadFontBase64();
+
+  console.log("[PDF] Building catalog HTML...");
+  const html = buildCatalogHtml(
+    {
+      ads: validAds,
+      accountName: options.accountName,
+      dateRange: options.dateRange,
+      currency: options.currency,
+    },
+    mediaImages,
+    logoBase64,
+    fontBase64,
+  );
+
+  const result = await htmlToPdf(html, { landscape: false });
+  console.log(`[PDF] generateCatalogPdf complete in ${Date.now() - totalStart}ms`);
   return result;
 }

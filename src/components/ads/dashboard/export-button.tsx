@@ -16,7 +16,7 @@ import {
   DialogFooter,
 } from "@/components/cpa/ui/dialog";
 import { Input } from "@/components/cpa/ui/input";
-import { Download, FileText, Presentation } from "lucide-react";
+import { Download, FileText, LayoutList, Presentation } from "lucide-react";
 import { LoadingSpinner } from "@/components/ads/ui/loading-spinner";
 import { toast } from "sonner";
 import type { AdCreativeRow } from "@/lib/ads/types/ad";
@@ -48,7 +48,7 @@ export function ExportButton({
   const [preparedBy, setPreparedBy] = useState("");
 
   const handleExport = async (
-    type: "quick" | "client",
+    type: "quick" | "client" | "catalog",
     options?: { title?: string; preparedBy?: string }
   ) => {
     setIsExporting(true);
@@ -129,6 +129,13 @@ export function ExportButton({
           >
             <Presentation className="h-4 w-4" aria-hidden="true" />
             דוח ללקוח
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            className="gap-2"
+            onClick={() => handleExport("catalog")}
+          >
+            <LayoutList className="h-4 w-4" aria-hidden="true" />
+            קטלוג מודעות
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
