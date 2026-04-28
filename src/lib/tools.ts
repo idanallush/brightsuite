@@ -58,4 +58,12 @@ export const TOOLS: ToolDefinition[] = [
     href: '/ads-hub',
     color: '#3b82f6',
   },
+  {
+    slug: 'ppc-retainer',
+    name: 'ניהול ריטיינרים',
+    description: 'תיק לקוחות PPC, רווחיות צוות, הוצאות ותחזית 12 חודשים',
+    icon: 'Briefcase',
+    href: '/ppc-retainer',
+    color: '#FFD400',
+  },
 ];

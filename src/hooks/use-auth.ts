@@ -23,7 +23,7 @@ const DEMO_USER = {
   name: 'עידן',
   role: 'admin' as const,
 };
-const DEMO_TOOLS: ToolSlug[] = ['ad-checker', 'budget', 'cpa', 'ads', 'writer', 'ads-hub'];
+const DEMO_TOOLS: ToolSlug[] = ['ad-checker', 'budget', 'cpa', 'ads', 'writer', 'ads-hub', 'ppc-retainer'];
 
 export function useAuth() {
   const router = useRouter();

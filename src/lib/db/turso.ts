@@ -6,7 +6,7 @@ let _initPromise: Promise<void> | null = null;
 // Bump this whenever init.ts has a new migration that must run on next warm
 // invocation. Module reload on new deploy will not reset _initPromise, so
 // checking this version lets us re-run init when code has changed.
-const INIT_VERSION = 3;
+const INIT_VERSION = 4;
 let _initVersion = 0;
 
 export function getTurso(): Client {

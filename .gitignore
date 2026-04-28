@@ -39,7 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-data/
+/data/
 .env.local
 
 # migration backups (DB snapshots, may contain sensitive data)

@@ -168,6 +168,51 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ah_sync_client ON ah_sync_log(client_id, started_at);
     CREATE INDEX IF NOT EXISTS idx_ah_campaigns_client ON ah_campaigns(client_id);
     CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
+
+    -- PPC Retainer Manager: agency clients on retainer
+    CREATE TABLE IF NOT EXISTS pr_clients (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      retainer REAL NOT NULL DEFAULT 0,
+      manager TEXT NOT NULL,
+      platforms TEXT NOT NULL DEFAULT '[]',
+      meta INTEGER NOT NULL DEFAULT 0,
+      google INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'archived')),
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- PPC Retainer Manager: team roster (revenue / employer cost per manager)
+    CREATE TABLE IF NOT EXISTS pr_team (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      revenue REAL NOT NULL DEFAULT 0,
+      employer_cost REAL NOT NULL DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- PPC Retainer Manager: fixed monthly expenses
+    CREATE TABLE IF NOT EXISTS pr_expenses (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      amount REAL NOT NULL DEFAULT 0,
+      note TEXT DEFAULT '',
+      category TEXT NOT NULL DEFAULT 'Tools',
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- PPC Retainer Manager: forecast settings (singleton row, id always = 1)
+    CREATE TABLE IF NOT EXISTS pr_forecast (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      new_monthly REAL NOT NULL DEFAULT 0,
+      churn_monthly REAL NOT NULL DEFAULT 0,
+      raise_pct REAL NOT NULL DEFAULT 0,
+      updated_at TEXT DEFAULT (datetime('now'))
+    );
   `);
 
   const db = getTurso();
@@ -199,5 +244,104 @@ export async function initDatabase(): Promise<void> {
     console.log('[DB] Bootstrapped first user to admin role');
   }
 
+  // PPC Retainer Manager: seed initial data on first run only (zero-row check
+  // for each table — safe to call repeatedly, idempotent across deploys).
+  await seedPpcRetainer(db);
+
   console.log('[DB] All tables and indexes created successfully');
+}
+
+async function seedPpcRetainer(db: ReturnType<typeof getTurso>) {
+  const clientCount = await db.execute({ sql: `SELECT COUNT(*) as c FROM pr_clients`, args: [] });
+  if (Number(clientCount.rows[0]?.c ?? 0) === 0) {
+    const seed: Array<[string, number, string, string[], number, number]> = [
+      ['שמרת הזורע', 9560, 'עידן', ['גוגל', 'מטא'], 11, 5],
+      ['מילגה', 6496, 'עידן', ['גוגל', 'מטא', 'טיקטוק'], 6, 5],
+      ['שנקר הנדסאים', 4207, 'עידן', ['גוגל', 'מטא'], 12, 11],
+      ['פאסוס פולראס', 5086, 'עידן', ['מטא'], 5, 0],
+      ['אלברט ארט', 7580, 'עידן', ['גוגל', 'מטא'], 6, 1],
+      ['IAC', 4500, 'שרון', ['גוגל', 'מטא'], 8, 2],
+      ['עודד קרבצ\'יק', 3800, 'שרון', ['מטא'], 2, 0],
+      ['פוטוטבע', 5956, 'שרון', ['גוגל', 'מטא'], 7, 1],
+      ['רייכמן IDC', 5853, 'שרון', ['גוגל', 'מטא', 'לינקדאין'], 8, 2],
+      ['רותם שני', 7003, 'שרון', ['גוגל', 'מטא', 'IDX'], 16, 10],
+      ['קומסקיור Eset', 7000, 'שרון', ['גוגל', 'מטא'], 2, 5],
+      ['Profit', 3000, 'בן', ['מטא'], 2, 0],
+      ['ויסמן רהיטים', 3000, 'בן', ['מטא'], 4, 0],
+      ['Inspire', 4000, 'בן', ['מטא'], 2, 0],
+      ['קידמה גז', 3000, 'בן', ['מטא'], 2, 0],
+      ['Meala', 1800, 'בן', ['לינקדאין'], 2, 0],
+      ['Safe Consulting', 2000, 'בן', ['מטא'], 2, 0],
+      ['Milk & Butterfly', 3800, 'בן', ['מטא'], 4, 0],
+      ['Hebrew Uni', 2500, 'דן', ['מטא', 'לינקדאין'], 3, 1],
+      ['Syberlion', 2500, 'דן', ['גוגל'], 0, 4],
+      ['Adcom', 1500, 'דן', ['לינקדאין'], 0, 1],
+      ['Elevation', 500, 'דן/ישי', ['מטא'], 3, 0],
+    ];
+    for (const [name, retainer, manager, platforms, meta, google] of seed) {
+      await db.execute({
+        sql: `INSERT INTO pr_clients (name, retainer, manager, platforms, meta, google) VALUES (?, ?, ?, ?, ?, ?)`,
+        args: [name, retainer, manager, JSON.stringify(platforms), meta, google],
+      });
+    }
+    console.log(`[DB] Seeded ${seed.length} PPC retainer clients`);
+  }
+
+  const teamCount = await db.execute({ sql: `SELECT COUNT(*) as c FROM pr_team`, args: [] });
+  if (Number(teamCount.rows[0]?.c ?? 0) === 0) {
+    const seed: Array<[string, number, number, number]> = [
+      ['עידן', 32929, 25300, 1],
+      ['שרון', 34112, 19690, 2],
+      ['בן', 20600, 21500, 3],
+      ['דן', 7000, 10750, 4],
+    ];
+    for (const [name, revenue, cost, order] of seed) {
+      await db.execute({
+        sql: `INSERT INTO pr_team (name, revenue, employer_cost, sort_order) VALUES (?, ?, ?, ?)`,
+        args: [name, revenue, cost, order],
+      });
+    }
+    console.log(`[DB] Seeded ${seed.length} PPC retainer team members`);
+  }
+
+  const expCount = await db.execute({ sql: `SELECT COUNT(*) as c FROM pr_expenses`, args: [] });
+  if (Number(expCount.rows[0]?.c ?? 0) === 0) {
+    const seed: Array<[string, number, string, string]> = [
+      ['Stape Meta CAPI', 315, 'דיווח המרות צד שרת לכל הלקוחות', 'Tracking'],
+      ['Windsor', 535, 'סנכרון דאטה בכל הפלטפורמות', 'Data'],
+      ['Supermetrics', 136, 'סנכרון דאטה בכל הפלטפורמות', 'Data'],
+      ['Google Workspace', 96.88, '3 מנויים שונים', 'Productivity'],
+      ['Elementor', 145, '1000 אתרים + אחסון', 'Productivity'],
+      ['OpenAI', 128, '2 מנויים שונים', 'AI'],
+      ['Canva', 48, '', 'Creative'],
+      ['Claude AI', 432, '3 מנויים שונים', 'AI'],
+      ['Kapwing', 77, 'עריכת וידאו', 'Creative'],
+      ['Monday', 790, 'כמעט ולא בשימוש', 'Productivity'],
+      ['Zapier', 164, 'אוטומציות', 'Productivity'],
+      ['אדמיניסטרציה', 2400, 'שרון ניהול משרד', 'Office'],
+      ['ראיית חשבון', 2200, 'מנהל חשבונות חברה בע״מ', 'Office'],
+      ['דמי כרטיס', 40, '', 'Office'],
+      ['AdScale', 2757, '', 'Tools'],
+      ['עיצוב סטודיו', 3000, 'העברה בנקאית', 'Creative'],
+      ['קופי גיא אורן', 2000, 'העברה בנקאית', 'Creative'],
+    ];
+    for (const [name, amount, note, category] of seed) {
+      await db.execute({
+        sql: `INSERT INTO pr_expenses (name, amount, note, category) VALUES (?, ?, ?, ?)`,
+        args: [name, amount, note, category],
+      });
+    }
+    console.log(`[DB] Seeded ${seed.length} PPC retainer expenses`);
+  }
+
+  const forecastCount = await db.execute({
+    sql: `SELECT COUNT(*) as c FROM pr_forecast`,
+    args: [],
+  });
+  if (Number(forecastCount.rows[0]?.c ?? 0) === 0) {
+    await db.execute({
+      sql: `INSERT INTO pr_forecast (id, new_monthly, churn_monthly, raise_pct) VALUES (1, 0, 0, 0)`,
+      args: [],
+    });
+  }
 }

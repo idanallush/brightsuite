@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'manager' | 'viewer';
 
-export type ToolSlug = 'ad-checker' | 'budget' | 'cpa' | 'ads' | 'writer' | 'ads-hub';
+export type ToolSlug = 'ad-checker' | 'budget' | 'cpa' | 'ads' | 'writer' | 'ads-hub' | 'ppc-retainer';
 
 export interface User {
   id: number;
