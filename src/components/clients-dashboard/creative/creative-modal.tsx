@@ -6,6 +6,12 @@ import CreativeChart from './creative-chart';
 import type { CreativeAssetRow, CreativeDailyRow } from '@/app/api/clients-dashboard/creative/[id]/route';
 import type { CreativeType } from '@/lib/clients-dashboard/types';
 
+interface VideoSourceResponse {
+  videoId: string;
+  source: string;
+  picture: string | null;
+}
+
 interface DetailResponse {
   creative: {
     id: number;
@@ -74,6 +80,18 @@ export default function CreativeModal({
     fetcher,
   );
 
+  // Lazy-resolve the playable video source only when the creative is a video
+  // and we don't already have a direct .mp4 in mediaUrl. Triggered by SWR
+  // condition — the request never fires for image / carousel / collection.
+  const needsVideoLookup =
+    data?.creative.type === 'video' &&
+    !(data.creative.mediaUrl && /\.mp4($|\?)/i.test(data.creative.mediaUrl));
+  const { data: videoSource } = useSWR<VideoSourceResponse>(
+    needsVideoLookup ? `/api/clients-dashboard/creative/${creativeId}/video-source` : null,
+    fetcher,
+    { shouldRetryOnError: false },
+  );
+
   return (
     <div
       className="cd-creative-modal-backdrop"
@@ -112,7 +130,7 @@ export default function CreativeModal({
           <div className="cd-creative-modal__body">
             <div>
               <div className="cd-creative-modal__media">
-                {renderMedia(data.creative)}
+                {renderMedia(data.creative, videoSource?.source ?? null)}
               </div>
 
               {data.assets.length > 0 && (
@@ -237,17 +255,27 @@ export default function CreativeModal({
   );
 }
 
-function renderMedia(c: DetailResponse['creative']) {
+function renderMedia(c: DetailResponse['creative'], resolvedVideoSource: string | null) {
   const src = c.mediaUrl || c.thumbnailUrl;
-  if (!src) {
+  if (!src && !resolvedVideoSource) {
     return (
       <span style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>אין תצוגת מדיה</span>
     );
   }
-  // Direct mp4 — render as <video>. Otherwise show the still thumbnail; Meta video_id
-  // requires a separate fetch with source URL we don't store at sync time.
+  // Prefer the lazily-resolved /{video_id}?fields=source URL when present.
+  if (c.type === 'video' && resolvedVideoSource) {
+    return (
+      <video
+        src={resolvedVideoSource}
+        controls
+        preload="metadata"
+        poster={c.thumbnailUrl || undefined}
+      />
+    );
+  }
+  // Direct mp4 already in mediaUrl (rare) — render as <video> without the extra hop.
   if (c.type === 'video' && c.mediaUrl && /\.mp4($|\?)/i.test(c.mediaUrl)) {
     return <video src={c.mediaUrl} controls preload="metadata" poster={c.thumbnailUrl || undefined} />;
   }
-  return <img src={src} alt={c.adName || ''} />;
+  return <img src={src!} alt={c.adName || ''} />;
 }
