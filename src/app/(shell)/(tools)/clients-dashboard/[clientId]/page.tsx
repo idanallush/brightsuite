@@ -6,6 +6,11 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid } from 'lucide-react';
 import type { ClientSummary } from '@/lib/clients-dashboard/types';
+import CampaignsTab from '@/components/clients-dashboard/campaigns/campaigns-tab';
+import CreativeTab from '@/components/clients-dashboard/creative/creative-tab';
+import HistoryTab from '@/components/clients-dashboard/history/history-tab';
+import AlertsTab from '@/components/clients-dashboard/alerts/alerts-tab';
+import ViewsTab from '@/components/clients-dashboard/views/views-tab';
 
 type ApiResponse = {
   clients: ClientSummary[];
@@ -23,12 +28,12 @@ async function fetcher<T>(url: string): Promise<T> {
 
 type Tab = 'campaigns' | 'creative' | 'history' | 'alerts' | 'views';
 
-const TABS: Array<{ id: Tab; label: string; icon: typeof BarChart3; owner: string }> = [
-  { id: 'campaigns', label: 'קמפיינים', icon: BarChart3, owner: 'Agent A' },
-  { id: 'creative', label: 'קראייטיב', icon: ImageIcon, owner: 'Agent B' },
-  { id: 'history', label: 'היסטוריה', icon: History, owner: 'Agent C' },
-  { id: 'alerts', label: 'התראות', icon: Bell, owner: 'Agent C' },
-  { id: 'views', label: 'תצוגות', icon: LayoutGrid, owner: 'Agent D' },
+const TABS: Array<{ id: Tab; label: string; icon: typeof BarChart3 }> = [
+  { id: 'campaigns', label: 'קמפיינים', icon: BarChart3 },
+  { id: 'creative', label: 'קראייטיב', icon: ImageIcon },
+  { id: 'history', label: 'היסטוריה', icon: History },
+  { id: 'alerts', label: 'התראות', icon: Bell },
+  { id: 'views', label: 'תצוגות', icon: LayoutGrid },
 ];
 
 function isoDaysAgo(days: number): string {
@@ -160,14 +165,11 @@ export default function ClientDetailPage({
         })}
       </div>
 
-      {TABS.map((t) =>
-        tab === t.id ? (
-          <div key={t.id} className="cd-placeholder">
-            <strong>{t.label}</strong>
-            תצוגה זו תיבנה על ידי {t.owner} בשלב 1. השלד והנתונים מוכנים לכך.
-          </div>
-        ) : null,
-      )}
+      {tab === 'campaigns' && <CampaignsTab client={client} />}
+      {tab === 'creative' && <CreativeTab client={client} />}
+      {tab === 'history' && <HistoryTab client={client} />}
+      {tab === 'alerts' && <AlertsTab client={client} />}
+      {tab === 'views' && <ViewsTab client={client} />}
     </div>
   );
 }
