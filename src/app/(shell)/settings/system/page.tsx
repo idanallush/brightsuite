@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'motion/react';
+import useSWR from 'swr';
 import {
   Code2,
   Database,
@@ -17,10 +18,39 @@ import {
   BarChart3,
   Briefcase,
   LayoutDashboard,
+  CheckCircle2,
+  AlertTriangle,
+  HelpCircle,
   type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/hooks/use-auth';
 import { TOOLS } from '@/lib/tools';
+
+type EnvSeverity = 'critical' | 'important' | 'optional';
+interface EnvCheck {
+  key: string;
+  label: string;
+  set: boolean;
+  severity: EnvSeverity;
+  purpose: string;
+}
+interface EnvHealthResponse {
+  checks: EnvCheck[];
+  summary: {
+    total: number;
+    set: number;
+    missingCritical: number;
+    missingImportant: number;
+    missingOptional: number;
+  };
+  checkedAt: string;
+}
+
+async function envFetcher(url: string): Promise<EnvHealthResponse> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+  return res.json();
+}
 
 const TOOL_ICONS: Record<string, LucideIcon> = {
   Shield,
@@ -124,6 +154,10 @@ const EXTERNAL_SERVICES = [
 
 export default function SystemPage() {
   const { user } = useAuth();
+  const { data: envHealth } = useSWR<EnvHealthResponse>(
+    user?.role === 'admin' ? '/api/system/env-health' : null,
+    envFetcher,
+  );
 
   if (user?.role !== 'admin') {
     return (
@@ -170,6 +204,43 @@ export default function SystemPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Env health */}
+      {envHealth && (
+        <motion.div
+          className="glass-card p-6"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: 'easeOut', delay: 0.04 }}
+        >
+          <SectionHead
+            icon={<Shield size={18} />}
+            title="בריאות משתני סביבה"
+            hint={`${envHealth.summary.set}/${envHealth.summary.total} מוגדרים`}
+          />
+          {envHealth.summary.missingCritical > 0 && (
+            <div
+              className="rounded-lg p-3 mb-3 text-xs flex items-start gap-2"
+              style={{
+                background: 'rgba(185, 28, 28, 0.08)',
+                border: '1px solid rgba(185, 28, 28, 0.3)',
+                color: '#b91c1c',
+              }}
+            >
+              <AlertTriangle size={14} style={{ marginTop: 1, flexShrink: 0 }} />
+              <span>
+                {envHealth.summary.missingCritical} משתנה קריטי חסר. חלק מהפונקציונליות תיכשל בפרודקשן —
+                הגדר ב-Vercel Project Settings → Environment Variables.
+              </span>
+            </div>
+          )}
+          <div className="grid md:grid-cols-2 gap-2">
+            {envHealth.checks.map((c) => (
+              <EnvRow key={c.key} check={c} />
+            ))}
+          </div>
+        </motion.div>
+      )}
 
       {/* Tools list */}
       <motion.div
@@ -472,6 +543,45 @@ function SysCard({
       </div>
       <div className="flex flex-col gap-2">{children}</div>
     </motion.div>
+  );
+}
+
+function EnvRow({ check }: { check: EnvCheck }) {
+  const Icon = check.set ? CheckCircle2 : check.severity === 'critical' ? AlertTriangle : HelpCircle;
+  const tone = check.set
+    ? { color: '#15803d', bg: 'rgba(34, 197, 94, 0.08)', border: 'rgba(34, 197, 94, 0.25)' }
+    : check.severity === 'critical'
+      ? { color: '#b91c1c', bg: 'rgba(185, 28, 28, 0.08)', border: 'rgba(185, 28, 28, 0.3)' }
+      : check.severity === 'important'
+        ? { color: '#a16207', bg: 'rgba(202, 138, 4, 0.08)', border: 'rgba(202, 138, 4, 0.3)' }
+        : { color: 'var(--text-tertiary)', bg: 'var(--card-bg)', border: 'var(--card-border)' };
+  const severityLabel: Record<EnvSeverity, string> = {
+    critical: 'קריטי',
+    important: 'חשוב',
+    optional: 'אופציונלי',
+  };
+
+  return (
+    <div
+      className="flex items-start gap-3 p-3 rounded-lg border"
+      style={{ borderColor: tone.border, background: tone.bg }}
+    >
+      <Icon size={16} style={{ color: tone.color, marginTop: 2, flexShrink: 0 }} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <code className="sys-code">{check.label}</code>
+          <span className="text-xs font-semibold" style={{ color: tone.color }}>
+            {check.set ? 'מוגדר' : 'חסר'}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+            · {severityLabel[check.severity]}
+          </span>
+        </div>
+        <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)', lineHeight: 1.5 }}>
+          {check.purpose}
+        </p>
+      </div>
+    </div>
   );
 }
 

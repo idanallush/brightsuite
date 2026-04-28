@@ -876,14 +876,47 @@
   border: 1px dashed var(--glass-border);
   background: var(--glass-bg);
   border-radius: 12px;
-  padding: 48px 24px;
+  padding: 56px 32px;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.cd-creative-empty__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent, #6366f1) 12%, transparent);
+  color: var(--accent, #6366f1);
+  margin-bottom: 4px;
+}
+
+.cd-creative-empty__title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
 }
 
 .cd-creative-empty p {
   color: var(--text-tertiary);
   font-size: 13px;
-  margin: 0 0 14px 0;
+  line-height: 1.6;
+  margin: 0 0 6px 0;
+  max-width: 460px;
+}
+
+.cd-creative-empty__hint {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  margin-top: 8px;
 }
 
 .cd-creative-empty__btn,
@@ -1620,4 +1653,49 @@
   font-size: 11px;
   color: #b91c1c;
   margin-top: 4px;
+}
+
+.cd-metric-toggle {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--glass-bg);
+  gap: 2px;
+}
+
+.cd-metric-toggle__btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  height: 22px;
+  padding: 0 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.cd-metric-toggle__btn:hover:not(:disabled):not(.cd-metric-toggle__btn--active) {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+}
+
+.cd-metric-toggle__btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.cd-metric-toggle__btn--active.cd-metric-toggle__btn--leads {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0369a1;
+}
+
+.cd-metric-toggle__btn--active.cd-metric-toggle__btn--ecommerce {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7e22ce;
 }

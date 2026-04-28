@@ -142,17 +142,33 @@ export default function CreativeTab({ client }: { client: ClientSummary }) {
 
       {!isLoading && !error && creatives.length === 0 && (
         <div className="cd-creative-empty">
-          <ImageIcon size={28} style={{ color: 'var(--text-tertiary)', marginBottom: 8 }} />
-          <p>עדיין אין קראייטיבים סנוכרנים עבור לקוח זה.</p>
-          <button
-            type="button"
-            className="cd-creative-empty__btn"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
-            {syncing ? 'מסנכרן…' : 'סנכרון קראייטיב'}
-          </button>
+          <div className="cd-creative-empty__icon">
+            <ImageIcon size={28} />
+          </div>
+          <h3 className="cd-creative-empty__title">
+            {client.hasMeta ? 'עדיין לא סונכרנו קראייטיבים' : 'אין חיבור Meta פעיל'}
+          </h3>
+          <p>
+            {client.hasMeta
+              ? 'לחיצה על "סנכרון" תמשוך מ-Meta את כל ה-ads האקטיביים, תסווג אותם לסוג (וידאו / תמונה / קרוסלה / קולקציה) ותציג גלריה עם ביצועים יומיים.'
+              : 'כדי להציג קראייטיבים צריך לחבר חשבון Meta ללקוח זה דרך טאב מערכת ב-Ads Hub.'}
+          </p>
+          {client.hasMeta && (
+            <button
+              type="button"
+              className="cd-creative-empty__btn"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+              {syncing ? 'מסנכרן מ-Meta…' : 'סנכרן קראייטיב מ-Meta'}
+            </button>
+          )}
+          {client.hasMeta && (
+            <div className="cd-creative-empty__hint">
+              הסנכרון אורך כמה שניות. ירוץ אוטומטית בעתיד; כרגע ידני.
+            </div>
+          )}
         </div>
       )}
 

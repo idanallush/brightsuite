@@ -5,12 +5,13 @@ import { useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid } from 'lucide-react';
-import type { ClientSummary } from '@/lib/clients-dashboard/types';
+import type { ClientSummary, MetricType } from '@/lib/clients-dashboard/types';
 import CampaignsTab from '@/components/clients-dashboard/campaigns/campaigns-tab';
 import CreativeTab from '@/components/clients-dashboard/creative/creative-tab';
 import HistoryTab from '@/components/clients-dashboard/history/history-tab';
 import AlertsTab from '@/components/clients-dashboard/alerts/alerts-tab';
 import ViewsTab from '@/components/clients-dashboard/views/views-tab';
+import { useAuth } from '@/hooks/use-auth';
 
 type ApiResponse = {
   clients: ClientSummary[];
@@ -69,14 +70,54 @@ export default function ClientDetailPage({
 
   // For now, fetch all clients and find this one. Once Agent A ships the
   // per-client API, swap to /api/clients-dashboard/clients/:id.
-  const { data, error, isLoading } = useSWR<ApiResponse>(
+  const { data, error, isLoading, mutate } = useSWR<ApiResponse>(
     `/api/clients-dashboard/clients?startDate=${startDate}&endDate=${endDate}`,
     fetcher,
   );
 
   const client = useMemo(() => data?.clients.find((c) => c.id === id) ?? null, [data, id]);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const [tab, setTab] = useState<Tab>('campaigns');
+  const [savingType, setSavingType] = useState(false);
+  const [typeError, setTypeError] = useState<string | null>(null);
+
+  async function handleMetricTypeChange(next: MetricType) {
+    if (!client || client.metricType === next || savingType) return;
+    setSavingType(true);
+    setTypeError(null);
+    // Optimistic update: patch the cached list immediately.
+    mutate(
+      (current) =>
+        current
+          ? {
+              ...current,
+              clients: current.clients.map((c) =>
+                c.id === client.id ? { ...c, metricType: next } : c,
+              ),
+            }
+          : current,
+      { revalidate: false },
+    );
+    try {
+      const res = await fetch(`/api/clients-dashboard/clients/${client.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metricType: next }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed: ${res.status}`);
+      }
+      await mutate();
+    } catch (err) {
+      setTypeError((err as Error).message);
+      await mutate();
+    } finally {
+      setSavingType(false);
+    }
+  }
 
   if (isLoading) {
     return <div className="cd-empty">טוען…</div>;
@@ -108,9 +149,36 @@ export default function ClientDetailPage({
         <div>
           <h1 className="cd-detail-name">{client.name}</h1>
           <div className="cd-detail-meta">
-            <span className={`cd-tag cd-pill--${client.metricType}`}>
-              {isEcom ? 'איקומרס' : 'לידים'}
-            </span>
+            {isAdmin ? (
+              <div className="cd-metric-toggle" role="group" aria-label="סוג מדידה">
+                <button
+                  type="button"
+                  className={`cd-metric-toggle__btn cd-metric-toggle__btn--leads${
+                    client.metricType === 'leads' ? ' cd-metric-toggle__btn--active' : ''
+                  }`}
+                  onClick={() => handleMetricTypeChange('leads')}
+                  disabled={savingType}
+                  aria-pressed={client.metricType === 'leads'}
+                >
+                  לידים
+                </button>
+                <button
+                  type="button"
+                  className={`cd-metric-toggle__btn cd-metric-toggle__btn--ecommerce${
+                    client.metricType === 'ecommerce' ? ' cd-metric-toggle__btn--active' : ''
+                  }`}
+                  onClick={() => handleMetricTypeChange('ecommerce')}
+                  disabled={savingType}
+                  aria-pressed={client.metricType === 'ecommerce'}
+                >
+                  איקומרס
+                </button>
+              </div>
+            ) : (
+              <span className={`cd-tag cd-pill--${client.metricType}`}>
+                {isEcom ? 'איקומרס' : 'לידים'}
+              </span>
+            )}
             <span>·</span>
             <span>{client.slug}</span>
             <span>·</span>
@@ -120,6 +188,11 @@ export default function ClientDetailPage({
                 .join(' · ') || 'אין חיבורים פעילים'}
             </span>
           </div>
+          {typeError && (
+            <div style={{ marginTop: 6, color: '#b91c1c', fontSize: 12 }}>
+              שמירה נכשלה: {typeError}
+            </div>
+          )}
         </div>
       </div>
 
