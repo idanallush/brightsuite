@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Pencil, Megaphone, ChevronDown, DollarSign, PlayCircle, PlusCircle, Trash2, ExternalLink, CalendarOff } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Pencil, Megaphone, ChevronDown, DollarSign, PlayCircle, PlusCircle, Trash2, ExternalLink, CalendarOff, MessageSquare, Check, X } from 'lucide-react'
 import type { CampaignWithBudget, Platform, CampaignStatus, ChangelogAction } from '@/lib/budget/types'
 import { useChangelog } from '@/hooks/budget/useChangelog'
 import { StatusDropdown } from '@/components/budget/StatusDropdown'
@@ -69,6 +69,60 @@ const ChangelogRow = ({ campaignId, colSpan }: { campaignId: string; colSpan: nu
   )
 }
 
+/* -- Inline campaign notes -- */
+
+const InlineNotes = ({ notes, onSave }: { notes: string | null; onSave: (val: string) => void }) => {
+  const [editing, setEditing] = useState(false)
+  const [value, setValue] = useState(notes ?? '')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editing && inputRef.current) inputRef.current.focus()
+  }, [editing])
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 mt-0.5">
+        <input
+          ref={inputRef}
+          type="text"
+          className="bg-[var(--card-bg-hover)] border border-[var(--glass-border)] rounded px-1.5 py-0.5 text-xs text-text-secondary w-full max-w-[200px] outline-none focus:border-accent"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') { onSave(value); setEditing(false) }
+            if (e.key === 'Escape') { setValue(notes ?? ''); setEditing(false) }
+          }}
+          placeholder="הוסף הערה..."
+        />
+        <button className="btn-icon !w-5 !h-5 !text-success" onClick={() => { onSave(value); setEditing(false) }}>
+          <Check size={10} />
+        </button>
+        <button className="btn-icon !w-5 !h-5" onClick={() => { setValue(notes ?? ''); setEditing(false) }}>
+          <X size={10} />
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <button
+      className="flex items-center gap-1 mt-0.5 bg-transparent border-none p-0 cursor-pointer group"
+      onClick={() => setEditing(true)}
+      title={notes || 'הוסף הערה'}
+    >
+      {notes ? (
+        <span className="text-xs text-text-muted truncate max-w-[180px]">{notes}</span>
+      ) : (
+        <span className="text-xs text-text-muted opacity-0 group-hover:opacity-60 transition-opacity flex items-center gap-1">
+          <MessageSquare size={10} />
+          הערה
+        </span>
+      )}
+    </button>
+  )
+}
+
 /* -- Campaign Table -- */
 
 interface CampaignTableProps {
@@ -81,14 +135,15 @@ interface CampaignTableProps {
   onEndDateEdit: (campaign: CampaignWithBudget) => void
   onDeleteCampaign: (campaign: CampaignWithBudget) => void
   onRemoveFromPlan: (campaign: CampaignWithBudget) => void
+  onNotesUpdate?: (campaignId: string, notes: string) => void
+  selectedIds?: Set<string>
+  onSelectionChange?: (ids: Set<string>) => void
 }
 
 const platformLabels: Record<Platform, string> = {
   facebook: 'Meta (Facebook)',
   google: 'Google Ads',
 }
-
-const COL_COUNT = 8
 
 const getEndDateUrgency = (endDate: string | null): 'expired' | 'soon' | 'ok' | null => {
   if (!endDate) return null
@@ -117,6 +172,9 @@ export const CampaignTable = ({
   onEndDateEdit,
   onDeleteCampaign,
   onRemoveFromPlan,
+  onNotesUpdate,
+  selectedIds,
+  onSelectionChange,
 }: CampaignTableProps) => {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [nameMode, setNameMode] = useState<'name' | 'technical'>('name')
@@ -134,6 +192,32 @@ export const CampaignTable = ({
       else next.add(id)
       return next
     })
+  }
+
+  const hasSelection = !!selectedIds && !!onSelectionChange
+  const platformIds = platformCampaigns.map(c => c.id)
+  const allSelected = hasSelection && platformIds.length > 0 && platformIds.every(id => selectedIds!.has(id))
+  const someSelected = hasSelection && platformIds.some(id => selectedIds!.has(id))
+
+  const COL_COUNT = hasSelection ? 9 : 8
+
+  const toggleAll = () => {
+    if (!onSelectionChange || !selectedIds) return
+    const next = new Set(selectedIds)
+    if (allSelected) {
+      platformIds.forEach(id => next.delete(id))
+    } else {
+      platformIds.forEach(id => next.add(id))
+    }
+    onSelectionChange(next)
+  }
+
+  const toggleOne = (id: string) => {
+    if (!onSelectionChange || !selectedIds) return
+    const next = new Set(selectedIds)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    onSelectionChange(next)
   }
 
   const totalDaily = platformCampaigns.reduce((sum, c) => sum + c.current_daily_budget, 0)
@@ -155,6 +239,17 @@ export const CampaignTable = ({
         <table className="glass-table">
           <thead>
             <tr>
+              {hasSelection && (
+                <th className="!w-10 !px-2">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={(el) => { if (el) el.indeterminate = someSelected && !allSelected }}
+                    onChange={toggleAll}
+                    className="accent-[#2563eb] w-3.5 h-3.5 cursor-pointer"
+                  />
+                </th>
+              )}
               <th>
                 <button
                   className="flex items-center gap-1 text-text-muted hover:text-text-primary transition-colors cursor-pointer bg-transparent border-none p-0 text-xs font-medium uppercase tracking-wider"
@@ -177,9 +272,21 @@ export const CampaignTable = ({
           <tbody>
             {platformCampaigns.map((campaign) => {
               const isExpanded = expandedIds.has(campaign.id)
+              const isRowSelected = hasSelection && selectedIds!.has(campaign.id)
               return (
                 <>
-                  <tr key={campaign.id}>
+                  <tr key={campaign.id} className={isRowSelected ? 'bg-[rgba(37,99,235,0.08)]' : ''}>
+                    {/* Checkbox */}
+                    {hasSelection && (
+                      <td className="!w-10 !px-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds!.has(campaign.id)}
+                          onChange={() => toggleOne(campaign.id)}
+                          className="accent-[#2563eb] w-3.5 h-3.5 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     {/* Campaign name + changes badge */}
                     <td>
                       <div className="flex flex-col min-w-0">
@@ -199,6 +306,12 @@ export const CampaignTable = ({
                         </div>
                         {nameMode === 'name' && campaign.campaign_type && (
                           <span className="text-xs text-text-muted">{campaign.campaign_type}</span>
+                        )}
+                        {onNotesUpdate && (
+                          <InlineNotes
+                            notes={campaign.notes}
+                            onSave={(val) => onNotesUpdate(campaign.id, val)}
+                          />
                         )}
                       </div>
                     </td>
@@ -331,7 +444,7 @@ export const CampaignTable = ({
 
             {/* Summary row */}
             <tr className="summary-row">
-              <td colSpan={4}>סה״כ {platformLabels[platform]}</td>
+              <td colSpan={hasSelection ? 5 : 4}>סה״כ {platformLabels[platform]}</td>
               <td className="font-semibold">{formatCurrency(totalDaily)}</td>
               <td className="font-semibold">{formatCurrency(totalForecast)}</td>
               <td className="font-semibold">

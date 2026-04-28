@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { enrichCampaignWithBudget } from '@/lib/budget/forecast'
 import type { Client, Campaign, BudgetPeriod, CampaignWithBudget } from '@/lib/budget/types'
 
@@ -45,5 +45,25 @@ export const useShareData = (token: string) => {
       return { client: data.client, campaigns: enrichedCampaigns }
     },
     enabled: !!token,
+  })
+}
+
+export const useShareUpdateNotes = (token: string) => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { campaign_id: string; notes: string }) => {
+      const res = await fetch(`/api/budget/share/${token}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      })
+
+      if (!res.ok) throw new Error('Failed to update notes')
+      return res.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['share', token] })
+    },
   })
 }

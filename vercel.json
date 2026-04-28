@@ -28,6 +28,9 @@
     },
     "src/app/api/ads-hub/sync/backfill/route.ts": {
       "maxDuration": 120
+    },
+    "src/app/api/budget/cron/daily-sync/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -38,6 +41,10 @@
     {
       "path": "/api/cron/ad-sync",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/budget/cron/daily-sync",
+      "schedule": "0 6 * * *"
     }
   ]
 }

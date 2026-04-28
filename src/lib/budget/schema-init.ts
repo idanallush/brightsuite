@@ -111,5 +111,28 @@ export async function initBudgetFlowTables(): Promise<void> {
       sql: `CREATE INDEX IF NOT EXISTS idx_bf_changelog_performed_at ON bf_changelog(performed_at)`,
       args: [],
     },
+    {
+      sql: `CREATE TABLE IF NOT EXISTS bf_sync_logs (
+        id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+        client_id TEXT REFERENCES bf_clients(id) ON DELETE CASCADE,
+        platform TEXT NOT NULL,
+        status TEXT NOT NULL,
+        created_count INTEGER NOT NULL DEFAULT 0,
+        updated_count INTEGER NOT NULL DEFAULT 0,
+        error TEXT,
+        duration_ms INTEGER,
+        triggered_by TEXT NOT NULL DEFAULT 'manual',
+        synced_at TEXT NOT NULL DEFAULT (datetime('now'))
+      )`,
+      args: [],
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_bf_sync_logs_client_id ON bf_sync_logs(client_id)`,
+      args: [],
+    },
+    {
+      sql: `CREATE INDEX IF NOT EXISTS idx_bf_sync_logs_synced_at ON bf_sync_logs(synced_at)`,
+      args: [],
+    },
   ]);
 }

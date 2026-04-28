@@ -370,3 +370,42 @@ export const useGoogleSync = () => {
     },
   })
 }
+
+export type BulkActionType = 'status' | 'delete' | 'update_ad_link' | 'remove_from_plan'
+
+export const useBulkAction = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: {
+      ids: string[]
+      action: BulkActionType
+      client_id: string
+      status?: string
+      end_date?: string
+      ad_link?: string
+      effective_date?: string
+    }) => {
+      if (isDemoMode()) {
+        return { success: true, action: input.action, affected: input.ids.length }
+      }
+
+      const { client_id: _clientId, ...payload } = input
+      const res = await fetchApi('/api/budget/campaigns/bulk', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Bulk action failed')
+      }
+
+      return res.json() as Promise<{ success: boolean; action: string; affected: number }>
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['campaigns', variables.client_id] })
+      queryClient.invalidateQueries({ queryKey: ['clients'] })
+    },
+  })
+}
