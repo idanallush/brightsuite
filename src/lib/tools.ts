@@ -51,9 +51,17 @@ export const TOOLS: ToolDefinition[] = [
     color: '#d946ef',
   },
   {
+    slug: 'clients-dashboard',
+    name: 'Clients Dashboard',
+    description: 'דשבורד לקוחות עם נתוני קמפיינים, קראייטיב, התראות ותצוגות מותאמות',
+    icon: 'LayoutDashboard',
+    href: '/clients-dashboard',
+    color: '#0ea5e9',
+  },
+  {
     slug: 'ads-hub',
     name: 'Ads Hub',
-    description: 'דשבורד מאוחד לנתוני פרסום מכל הפלטפורמות',
+    description: 'דשבורד מאוחד לנתוני פרסום מכל הפלטפורמות (legacy)',
     icon: 'BarChart3',
     href: '/ads-hub',
     color: '#3b82f6',

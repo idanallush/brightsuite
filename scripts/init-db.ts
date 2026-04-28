@@ -200,6 +200,7 @@ async function init() {
       google_mcc_id TEXT,
       ga4_property_id TEXT,
       currency TEXT DEFAULT 'ILS',
+      metric_type TEXT DEFAULT 'leads' CHECK (metric_type IN ('leads', 'ecommerce')),
       is_active INTEGER DEFAULT 1,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
@@ -228,9 +229,11 @@ async function init() {
       clicks INTEGER DEFAULT 0,
       conversions REAL DEFAULT 0,
       spend REAL DEFAULT 0,
+      revenue REAL DEFAULT 0,
       cpc REAL,
       ctr REAL,
       cpl REAL,
+      roas REAL,
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(platform, campaign_id, date)
     );
@@ -284,6 +287,110 @@ async function init() {
     CREATE INDEX IF NOT EXISTS idx_ah_sync_client ON ah_sync_log(client_id, started_at);
     CREATE INDEX IF NOT EXISTS idx_ah_campaigns_client ON ah_campaigns(client_id);
     CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
+
+    CREATE TABLE IF NOT EXISTS cd_creatives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+      platform_ad_id TEXT NOT NULL,
+      platform_campaign_id TEXT,
+      ad_name TEXT,
+      type TEXT NOT NULL CHECK (type IN ('video', 'image', 'carousel', 'collection')),
+      thumbnail_url TEXT,
+      media_url TEXT,
+      headline TEXT,
+      body TEXT,
+      cta TEXT,
+      landing_url TEXT,
+      effective_status TEXT,
+      first_seen_at TEXT DEFAULT (datetime('now')),
+      last_seen_at TEXT DEFAULT (datetime('now')),
+      raw_json TEXT,
+      UNIQUE(platform, platform_ad_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS cd_creative_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creative_id INTEGER NOT NULL REFERENCES cd_creatives(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      asset_type TEXT NOT NULL CHECK (asset_type IN ('video', 'image')),
+      thumbnail_url TEXT,
+      media_url TEXT,
+      headline TEXT,
+      body TEXT,
+      landing_url TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS cd_creative_performance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creative_id INTEGER NOT NULL REFERENCES cd_creatives(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      impressions INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
+      spend REAL DEFAULT 0,
+      conversions REAL DEFAULT 0,
+      revenue REAL DEFAULT 0,
+      video_views INTEGER DEFAULT 0,
+      p25 INTEGER DEFAULT 0,
+      p50 INTEGER DEFAULT 0,
+      p75 INTEGER DEFAULT 0,
+      p95 INTEGER DEFAULT 0,
+      p100 INTEGER DEFAULT 0,
+      UNIQUE(creative_id, date)
+    );
+
+    CREATE TABLE IF NOT EXISTS cd_campaign_changes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      campaign_id INTEGER REFERENCES ah_campaigns(id) ON DELETE SET NULL,
+      platform TEXT NOT NULL,
+      platform_campaign_id TEXT,
+      change_type TEXT NOT NULL,
+      field TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      source TEXT NOT NULL DEFAULT 'sync' CHECK (source IN ('sync', 'user', 'system')),
+      user_id INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
+      detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      note TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS cd_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      campaign_id INTEGER REFERENCES ah_campaigns(id) ON DELETE SET NULL,
+      platform TEXT,
+      severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT,
+      metric_value REAL,
+      threshold_value REAL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved')),
+      acknowledged_by INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
+      acknowledged_at TEXT,
+      resolved_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS cd_user_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES bs_users(id) ON DELETE CASCADE,
+      scope TEXT NOT NULL,
+      name TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, scope, name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cd_creatives_client ON cd_creatives(client_id);
+    CREATE INDEX IF NOT EXISTS idx_cd_creative_perf ON cd_creative_performance(creative_id, date);
+    CREATE INDEX IF NOT EXISTS idx_cd_changes_client ON cd_campaign_changes(client_id, detected_at);
+    CREATE INDEX IF NOT EXISTS idx_cd_changes_campaign ON cd_campaign_changes(campaign_id, detected_at);
+    CREATE INDEX IF NOT EXISTS idx_cd_alerts_client_status ON cd_alerts(client_id, status, severity);
+    CREATE INDEX IF NOT EXISTS idx_cd_views_user ON cd_user_views(user_id, scope);
   `);
 
   // Create admin user (will sign in via Google OAuth)
@@ -306,7 +413,7 @@ async function init() {
   }
 
   // Grant all tool permissions
-  const tools = ['ad-checker', 'budget', 'cpa', 'ads', 'writer', 'ads-hub'];
+  const tools = ['ad-checker', 'budget', 'cpa', 'ads', 'writer', 'ads-hub', 'clients-dashboard'];
   for (const tool of tools) {
     await db.execute({
       sql: 'INSERT OR IGNORE INTO bs_tool_permissions (user_id, tool_slug, granted_by) VALUES (?, ?, ?)',

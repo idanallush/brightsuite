@@ -99,6 +99,7 @@ export async function initDatabase(): Promise<void> {
     );
 
     -- Ads Hub: Daily performance metrics
+    -- revenue/roas added 2026-04-28 for ecommerce clients (metric_type='ecommerce')
     CREATE TABLE IF NOT EXISTS ah_performance_daily (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
@@ -109,9 +110,11 @@ export async function initDatabase(): Promise<void> {
       clicks INTEGER DEFAULT 0,
       conversions REAL DEFAULT 0,
       spend REAL DEFAULT 0,
+      revenue REAL DEFAULT 0,
       cpc REAL,
       ctr REAL,
       cpl REAL,
+      roas REAL,
       created_at TEXT DEFAULT (datetime('now')),
       UNIQUE(platform, campaign_id, date)
     );
@@ -168,6 +171,128 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_ah_sync_client ON ah_sync_log(client_id, started_at);
     CREATE INDEX IF NOT EXISTS idx_ah_campaigns_client ON ah_campaigns(client_id);
     CREATE INDEX IF NOT EXISTS idx_ah_video_client ON ah_video_ads(client_id);
+
+    -- ============================================================
+    -- Clients Dashboard (cd_) — new top-level dashboard sharing the
+    -- ah_clients / ah_campaigns / ah_performance_daily data layer,
+    -- but adding edit history, alerts, custom views, and unified
+    -- creatives (video / image / carousel / collection).
+    -- ============================================================
+
+    -- Unified creative catalog. Replaces the video-only ah_video_ads going
+    -- forward. type discriminates between video / image / carousel / collection.
+    -- Carousel children are joined via cd_creative_assets.
+    CREATE TABLE IF NOT EXISTS cd_creatives (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+      platform_ad_id TEXT NOT NULL,
+      platform_campaign_id TEXT,
+      ad_name TEXT,
+      type TEXT NOT NULL CHECK (type IN ('video', 'image', 'carousel', 'collection')),
+      thumbnail_url TEXT,
+      media_url TEXT,
+      headline TEXT,
+      body TEXT,
+      cta TEXT,
+      landing_url TEXT,
+      effective_status TEXT,
+      first_seen_at TEXT DEFAULT (datetime('now')),
+      last_seen_at TEXT DEFAULT (datetime('now')),
+      raw_json TEXT,
+      UNIQUE(platform, platform_ad_id)
+    );
+
+    -- Per-asset rows for carousels / collections (one creative -> N assets).
+    CREATE TABLE IF NOT EXISTS cd_creative_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creative_id INTEGER NOT NULL REFERENCES cd_creatives(id) ON DELETE CASCADE,
+      sort_order INTEGER NOT NULL DEFAULT 0,
+      asset_type TEXT NOT NULL CHECK (asset_type IN ('video', 'image')),
+      thumbnail_url TEXT,
+      media_url TEXT,
+      headline TEXT,
+      body TEXT,
+      landing_url TEXT
+    );
+
+    -- Per-creative daily performance (impressions, spend, conversions, video views).
+    CREATE TABLE IF NOT EXISTS cd_creative_performance (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      creative_id INTEGER NOT NULL REFERENCES cd_creatives(id) ON DELETE CASCADE,
+      date TEXT NOT NULL,
+      impressions INTEGER DEFAULT 0,
+      clicks INTEGER DEFAULT 0,
+      spend REAL DEFAULT 0,
+      conversions REAL DEFAULT 0,
+      revenue REAL DEFAULT 0,
+      video_views INTEGER DEFAULT 0,
+      p25 INTEGER DEFAULT 0,
+      p50 INTEGER DEFAULT 0,
+      p75 INTEGER DEFAULT 0,
+      p95 INTEGER DEFAULT 0,
+      p100 INTEGER DEFAULT 0,
+      UNIQUE(creative_id, date)
+    );
+
+    -- Campaign edit history. Detected via diffing campaign snapshots on each
+    -- sync, or written explicitly by user actions in the dashboard.
+    CREATE TABLE IF NOT EXISTS cd_campaign_changes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      campaign_id INTEGER REFERENCES ah_campaigns(id) ON DELETE SET NULL,
+      platform TEXT NOT NULL,
+      platform_campaign_id TEXT,
+      change_type TEXT NOT NULL,
+      field TEXT,
+      old_value TEXT,
+      new_value TEXT,
+      source TEXT NOT NULL DEFAULT 'sync' CHECK (source IN ('sync', 'user', 'system')),
+      user_id INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
+      detected_at TEXT NOT NULL DEFAULT (datetime('now')),
+      note TEXT
+    );
+
+    -- Anomaly / problem alerts produced by the alerts engine.
+    -- status: 'open' (visible) | 'acknowledged' (snoozed) | 'resolved' (auto-cleared).
+    CREATE TABLE IF NOT EXISTS cd_alerts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      campaign_id INTEGER REFERENCES ah_campaigns(id) ON DELETE SET NULL,
+      platform TEXT,
+      severity TEXT NOT NULL CHECK (severity IN ('info', 'warning', 'critical')),
+      kind TEXT NOT NULL,
+      title TEXT NOT NULL,
+      detail TEXT,
+      metric_value REAL,
+      threshold_value REAL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'acknowledged', 'resolved')),
+      acknowledged_by INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
+      acknowledged_at TEXT,
+      resolved_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    );
+
+    -- Per-user saved view layouts (filters, sort, columns, widget order).
+    -- payload is opaque JSON owned by the dashboard front-end.
+    CREATE TABLE IF NOT EXISTS cd_user_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES bs_users(id) ON DELETE CASCADE,
+      scope TEXT NOT NULL,
+      name TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, scope, name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cd_creatives_client ON cd_creatives(client_id);
+    CREATE INDEX IF NOT EXISTS idx_cd_creative_perf ON cd_creative_performance(creative_id, date);
+    CREATE INDEX IF NOT EXISTS idx_cd_changes_client ON cd_campaign_changes(client_id, detected_at);
+    CREATE INDEX IF NOT EXISTS idx_cd_changes_campaign ON cd_campaign_changes(campaign_id, detected_at);
+    CREATE INDEX IF NOT EXISTS idx_cd_alerts_client_status ON cd_alerts(client_id, status, severity);
+    CREATE INDEX IF NOT EXISTS idx_cd_views_user ON cd_user_views(user_id, scope);
 
     -- PPC Retainer Manager: agency clients on retainer
     CREATE TABLE IF NOT EXISTS pr_clients (
@@ -227,6 +352,27 @@ export async function initDatabase(): Promise<void> {
       args: [],
     });
     console.log('[DB] Added metric_type column to ah_clients');
+  }
+
+  // Migration: add revenue/roas to ah_performance_daily for ecommerce clients.
+  const perfCols = await db.execute({
+    sql: `PRAGMA table_info(ah_performance_daily)`,
+    args: [],
+  });
+  const perfColNames = new Set(perfCols.rows.map((r) => r.name as string));
+  if (!perfColNames.has('revenue')) {
+    await db.execute({
+      sql: `ALTER TABLE ah_performance_daily ADD COLUMN revenue REAL DEFAULT 0`,
+      args: [],
+    });
+    console.log('[DB] Added revenue column to ah_performance_daily');
+  }
+  if (!perfColNames.has('roas')) {
+    await db.execute({
+      sql: `ALTER TABLE ah_performance_daily ADD COLUMN roas REAL`,
+      args: [],
+    });
+    console.log('[DB] Added roas column to ah_performance_daily');
   }
 
   // Bootstrap: if no admin exists yet, promote the earliest active user to admin.
