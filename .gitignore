@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 data/
 .env.local
+
+# migration backups (DB snapshots, may contain sensitive data)
+/scripts/backups/
