@@ -140,12 +140,24 @@ export async function initBudgetFlowTables(): Promise<void> {
   // Without this, sync re-creates campaigns that the user manually removed
   // (Meta still reports them as ACTIVE/PAUSED for months after stop_time).
   const campCols = await db.execute({ sql: `PRAGMA table_info(bf_campaigns)`, args: [] });
-  const hasDismissedAt = campCols.rows.some((r) => r.name === 'dismissed_at');
-  if (!hasDismissedAt) {
+  const colNames = new Set(campCols.rows.map((r) => r.name as string));
+
+  if (!colNames.has('dismissed_at')) {
     await db.execute({
       sql: `ALTER TABLE bf_campaigns ADD COLUMN dismissed_at TEXT`,
       args: [],
     });
     console.log('[BF] Added dismissed_at column to bf_campaigns');
+  }
+
+  // Migration: track the last Meta-reported daily budget per campaign so we
+  // can detect Meta-side changes and propagate them as new budget periods,
+  // while still letting manual edits stick when Meta hasn't moved.
+  if (!colNames.has('meta_daily_budget')) {
+    await db.execute({
+      sql: `ALTER TABLE bf_campaigns ADD COLUMN meta_daily_budget REAL`,
+      args: [],
+    });
+    console.log('[BF] Added meta_daily_budget column to bf_campaigns');
   }
 }

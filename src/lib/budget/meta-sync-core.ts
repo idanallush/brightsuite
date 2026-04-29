@@ -295,6 +295,10 @@ export async function syncMetaForClient(
 
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
   const seedBudgetPeriod = async (
     campaignId: string,
     campaignName: string,
@@ -318,16 +322,54 @@ export async function syncMetaForClient(
     });
   };
 
+  // Close current open period and open a new one with the Meta value.
+  // Used when Meta's daily budget has changed since we last looked.
+  const propagateMetaBudgetChange = async (
+    campaignId: string,
+    campaignName: string,
+    oldBudget: number,
+    newBudget: number,
+  ) => {
+    await db.execute({
+      sql: `UPDATE bf_budget_periods SET end_date = ?
+            WHERE campaign_id = ? AND end_date IS NULL`,
+      args: [yesterdayStr, campaignId],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_budget_periods (campaign_id, daily_budget, start_date, created_by)
+            VALUES (?, ?, ?, 'Meta Sync')`,
+      args: [campaignId, newBudget, todayStr],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_changelog (campaign_id, action, description, old_value, new_value, performed_by)
+            VALUES (?, 'budget_change', ?, ?, ?, 'Meta Sync')`,
+      args: [
+        campaignId,
+        `תקציב סונכרן מ-Meta: ₪${oldBudget} → ₪${newBudget} — ${campaignName}`,
+        String(oldBudget),
+        String(newBudget),
+      ],
+    });
+  };
+
   for (const mc of metaCampaigns) {
     const spend = spendMap.get(mc.id) ?? 0;
     const status = mapMetaStatus(mc.status, mc.start_time);
     const existing = metaIdMap.get(mc.id);
     const dailyBudget = dailyBudgetMap.get(mc.id) ?? 0;
 
-    // Honor manual dismissals: user clicked the trash on this campaign,
-    // skip it entirely so we don't re-create it AND don't refresh its data.
+    // Dismissal handling. The dismissal exists to keep stale Meta entries
+    // (PAUSED months ago, but Meta still reports them) from re-appearing.
+    // If a dismissed campaign has current-month spend, it's a real active
+    // campaign the user (or their bulk-delete) removed by mistake — bring
+    // it back automatically. Otherwise honor the dismissal and skip.
     if (existing && existing.dismissed_at) {
-      continue;
+      if (spend <= 0) continue;
+      await db.execute({
+        sql: 'UPDATE bf_campaigns SET dismissed_at = NULL WHERE id = ?',
+        args: [existing.id as string],
+      });
+      existing.dismissed_at = null;
     }
 
     const adLink = await fetchTopAdLink(mc.id, accountId, accessToken, monthStart, todayStr);
@@ -339,11 +381,43 @@ export async function syncMetaForClient(
         args: [spend, currentMonth, status, adLink, now.toISOString(), existingId],
       });
 
-      // Seed a budget period for previously-synced campaigns that never had one.
-      // Manual edits (= an existing open period) are preserved.
-      if (!hasOpenPeriod.has(existingId)) {
-        const seedStart = (existing.start_date as string | null) || todayStr;
-        await seedBudgetPeriod(existingId, mc.name, dailyBudget, seedStart);
+      // Budget reconciliation against Meta.
+      //
+      // We track the *last Meta-reported* daily budget on the campaign row
+      // (meta_daily_budget). On each sync:
+      //   - If Meta reports a budget for the first time → seed a period
+      //     (when none exists) and record the baseline.
+      //   - If Meta's value changed since last sync → close the open period
+      //     and create a new one at Meta's value. This means Meta-side
+      //     changes flow through even if the user previously edited
+      //     manually — manual edits are a stopgap, Meta is the source of
+      //     truth when it moves.
+      //   - If Meta hasn't moved → leave everything alone (manual edits
+      //     stick).
+      // dailyBudget=0 means Meta returned no daily budget (e.g. lifetime
+      // budget) — we don't propagate zero, leave whatever the user has.
+      if (dailyBudget > 0) {
+        const lastMetaBudget =
+          existing.meta_daily_budget !== null && existing.meta_daily_budget !== undefined
+            ? Number(existing.meta_daily_budget)
+            : null;
+
+        if (lastMetaBudget === null) {
+          if (!hasOpenPeriod.has(existingId)) {
+            const seedStart = (existing.start_date as string | null) || todayStr;
+            await seedBudgetPeriod(existingId, mc.name, dailyBudget, seedStart);
+          }
+          await db.execute({
+            sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
+            args: [dailyBudget, existingId],
+          });
+        } else if (dailyBudget !== lastMetaBudget) {
+          await propagateMetaBudgetChange(existingId, mc.name, lastMetaBudget, dailyBudget);
+          await db.execute({
+            sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
+            args: [dailyBudget, existingId],
+          });
+        }
       }
 
       updated++;
@@ -352,8 +426,8 @@ export async function syncMetaForClient(
       const endDate = mc.stop_time ? mc.stop_time.split('T')[0] : null;
 
       const newCampaignResult = await db.execute({
-        sql: `INSERT INTO bf_campaigns (client_id, name, technical_name, platform, campaign_type, meta_campaign_id, actual_spend, actual_spend_month, ad_link, status, start_date, end_date, last_synced_at)
-              VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        sql: `INSERT INTO bf_campaigns (client_id, name, technical_name, platform, campaign_type, meta_campaign_id, actual_spend, actual_spend_month, ad_link, status, start_date, end_date, last_synced_at, meta_daily_budget)
+              VALUES (?, ?, ?, 'facebook', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         args: [
           clientId,
           mc.name,
@@ -367,6 +441,7 @@ export async function syncMetaForClient(
           startDate,
           endDate,
           now.toISOString(),
+          dailyBudget > 0 ? dailyBudget : null,
         ],
       });
 
