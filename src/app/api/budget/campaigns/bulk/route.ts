@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { getTurso } from '@/lib/db/turso';
-import { json, error } from '@/lib/budget/api-helpers';
+import { json, error, ensureBudgetSchema } from '@/lib/budget/api-helpers';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 
 const statusLabels: Record<string, string> = {
@@ -12,6 +12,7 @@ const statusLabels: Record<string, string> = {
 
 // PUT /api/budget/campaigns/bulk — bulk actions on multiple campaigns
 export async function PUT(request: NextRequest) {
+  await ensureBudgetSchema();
   const { session, error: authError } = await requireApiAuth();
   if (authError) return authError;
 
@@ -68,10 +69,13 @@ export async function PUT(request: NextRequest) {
       return json({ success: true, action: 'status', affected: ids.length });
     }
 
-    // Bulk delete
+    // Bulk delete — soft-delete via dismissed_at so Meta sync can't resurrect
+    // the rows. See campaigns/[id] DELETE handler for the same rationale.
     if (action === 'delete') {
       await db.execute({
-        sql: `DELETE FROM bf_campaigns WHERE id IN (${placeholders})`,
+        sql: `UPDATE bf_campaigns
+              SET dismissed_at = datetime('now')
+              WHERE id IN (${placeholders}) AND dismissed_at IS NULL`,
         args: ids,
       });
 

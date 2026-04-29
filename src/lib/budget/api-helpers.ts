@@ -6,7 +6,7 @@ import type { SessionData } from '@/types/auth';
 // Memoize per-process so we run init once on cold start, not per-request.
 // On failure we reset so the next request retries instead of caching the error.
 let _bfSchemaPromise: Promise<void> | null = null;
-function ensureBudgetSchema(): Promise<void> {
+export function ensureBudgetSchema(): Promise<void> {
   if (!_bfSchemaPromise) {
     _bfSchemaPromise = initBudgetFlowTables().catch((err) => {
       _bfSchemaPromise = null;
