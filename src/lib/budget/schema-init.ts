@@ -135,4 +135,17 @@ export async function initBudgetFlowTables(): Promise<void> {
       args: [],
     },
   ]);
+
+  // Migration: add dismissed_at to bf_campaigns so DELETE can soft-delete.
+  // Without this, sync re-creates campaigns that the user manually removed
+  // (Meta still reports them as ACTIVE/PAUSED for months after stop_time).
+  const campCols = await db.execute({ sql: `PRAGMA table_info(bf_campaigns)`, args: [] });
+  const hasDismissedAt = campCols.rows.some((r) => r.name === 'dismissed_at');
+  if (!hasDismissedAt) {
+    await db.execute({
+      sql: `ALTER TABLE bf_campaigns ADD COLUMN dismissed_at TEXT`,
+      args: [],
+    });
+    console.log('[BF] Added dismissed_at column to bf_campaigns');
+  }
 }

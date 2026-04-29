@@ -220,9 +220,15 @@ export async function syncMetaForClient(
   for (const mc of metaCampaigns) {
     const spend = spendMap.get(mc.id) ?? 0;
     const status = mapMetaStatus(mc.status, mc.start_time);
-    const adLink = await fetchTopAdLink(mc.id, accountId, accessToken, monthStart, todayStr);
-
     const existing = metaIdMap.get(mc.id);
+
+    // Honor manual dismissals: user clicked the trash on this campaign,
+    // skip it entirely so we don't re-create it AND don't refresh its data.
+    if (existing && existing.dismissed_at) {
+      continue;
+    }
+
+    const adLink = await fetchTopAdLink(mc.id, accountId, accessToken, monthStart, todayStr);
 
     if (existing) {
       await db.execute({

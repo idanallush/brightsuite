@@ -147,6 +147,11 @@ export async function syncGoogleForClient(
 
     const existing = googleIdMap.get(gc.id);
 
+    // Skip campaigns the user manually dismissed.
+    if (existing && existing.dismissed_at) {
+      continue;
+    }
+
     if (existing) {
       await db.execute({
         sql: `UPDATE bf_campaigns SET actual_spend = ?, actual_spend_month = ?, status = ?, ad_link = ?, last_synced_at = ? WHERE id = ?`,

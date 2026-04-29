@@ -213,7 +213,11 @@ export async function PUT(
   }
 }
 
-// DELETE /api/budget/campaigns/[id] — delete campaign
+// DELETE /api/budget/campaigns/[id] — soft-delete campaign
+// We don't hard-delete because Meta keeps reporting the campaign as
+// ACTIVE/PAUSED long after stop_time, and a hard delete would let the
+// next sync re-create the row. Soft-delete via dismissed_at lets sync
+// look it up by meta_campaign_id and skip it.
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -227,7 +231,10 @@ export async function DELETE(
   try {
     const db = getTurso();
     const result = await db.execute({
-      sql: 'DELETE FROM bf_campaigns WHERE id = ? RETURNING *',
+      sql: `UPDATE bf_campaigns
+            SET dismissed_at = datetime('now')
+            WHERE id = ? AND dismissed_at IS NULL
+            RETURNING *`,
       args: [id],
     });
 

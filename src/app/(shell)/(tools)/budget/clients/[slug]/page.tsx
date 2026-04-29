@@ -367,8 +367,8 @@ export default function ClientViewPage() {
             היסטוריית שינויים
           </Button>
           <Button variant="ghost" onClick={copyShareLink}>
-            <Copy size={16} style={{ color: '#2563eb' }} />
             קישור שיתוף
+            <Copy size={16} style={{ color: '#2563eb' }} />
           </Button>
           <Button variant="ghost" onClick={handleSync} disabled={metaSync.isPending}>
             <RefreshCw size={16} className={metaSync.isPending ? 'animate-spin' : ''} />

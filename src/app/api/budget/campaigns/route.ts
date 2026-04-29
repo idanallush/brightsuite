@@ -14,7 +14,9 @@ export async function GET(request: NextRequest) {
     const db = getTurso();
 
     const campaignResult = await db.execute({
-      sql: 'SELECT * FROM bf_campaigns WHERE client_id = ? ORDER BY platform, name',
+      sql: `SELECT * FROM bf_campaigns
+            WHERE client_id = ? AND dismissed_at IS NULL
+            ORDER BY platform, name`,
       args: [clientId],
     });
 
