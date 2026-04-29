@@ -174,8 +174,14 @@ export default function ClientViewPage() {
     let adAccountId = client.meta_ad_account_id
     if (!adAccountId) {
       const input = prompt('הזן Meta Ad Account ID (למשל: act_123456789):')
-      if (!input) return
-      adAccountId = input
+      if (input === null) {
+        return
+      }
+      if (!input.trim()) {
+        toast.error('סנכרון בוטל — חסר Meta Ad Account ID')
+        return
+      }
+      adAccountId = input.trim()
     }
     try {
       const result = await metaSync.mutateAsync({
@@ -196,14 +202,26 @@ export default function ClientViewPage() {
 
     if (!customerId) {
       const input = prompt('הזן Google Ads Customer ID (10 ספרות, בלי מקפים):')
-      if (!input) return
-      customerId = input.replace(/-/g, '')
+      if (input === null) {
+        return
+      }
+      if (!input.trim()) {
+        toast.error('סנכרון Google בוטל — חסר Customer ID')
+        return
+      }
+      customerId = input.trim().replace(/-/g, '')
     }
 
     if (!mccId) {
       const input = prompt('הזן Google MCC ID (10 ספרות, בלי מקפים):')
-      if (!input) return
-      mccId = input.replace(/-/g, '')
+      if (input === null) {
+        return
+      }
+      if (!input.trim()) {
+        toast.error('סנכרון Google בוטל — חסר MCC ID')
+        return
+      }
+      mccId = input.trim().replace(/-/g, '')
     }
 
     try {

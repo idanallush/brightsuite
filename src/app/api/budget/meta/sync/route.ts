@@ -2,11 +2,20 @@ import { NextRequest } from 'next/server';
 import { getTurso } from '@/lib/db/turso';
 import { json, error } from '@/lib/budget/api-helpers';
 import { syncMetaForClient } from '@/lib/budget/meta-sync-core';
+import { getActiveAccessToken } from '@/lib/ads-hub/meta-ads-service';
 
 // POST /api/budget/meta/sync — sync campaigns from Meta Ads
 export async function POST(request: NextRequest) {
-  const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
-  if (!accessToken) return error('FACEBOOK_ACCESS_TOKEN not configured', 500);
+  // Pull the active OAuth access token from bs_fb_connections (same source
+  // that Ads Hub and Clients Dashboard use). The legacy FACEBOOK_ACCESS_TOKEN
+  // env var was stale and unset — moving everything to OAuth.
+  const accessToken = await getActiveAccessToken();
+  if (!accessToken) {
+    return error(
+      'No active Meta access token. Connect Facebook in Settings → Connections.',
+      503,
+    );
+  }
 
   const body = await request.json().catch(() => null);
   const { client_id, ad_account_id } = body ?? {};

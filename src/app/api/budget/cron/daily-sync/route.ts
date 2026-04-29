@@ -3,6 +3,7 @@ import { getTurso } from '@/lib/db/turso';
 import { initBudgetFlowTables } from '@/lib/budget/schema-init';
 import { syncMetaForClient } from '@/lib/budget/meta-sync-core';
 import { syncGoogleForClient } from '@/lib/budget/google-sync-core';
+import { getActiveAccessToken } from '@/lib/ads-hub/meta-ads-service';
 
 export const maxDuration = 300;
 
@@ -43,7 +44,9 @@ export async function GET(request: NextRequest) {
     const activeClients = activeClientsResult.rows;
 
     const results: SyncResult[] = [];
-    const accessToken = process.env.FACEBOOK_ACCESS_TOKEN;
+    // OAuth token from bs_fb_connections — same source as Ads Hub / Clients Dashboard.
+    const accessToken = await getActiveAccessToken();
+    const noTokenError = 'No active Meta access token (connect Facebook in Settings → Connections)';
 
     for (const client of activeClients) {
       const clientId = client.id as string;
@@ -58,13 +61,13 @@ export async function GET(request: NextRequest) {
         if (!accessToken) {
           result.meta = {
             success: false,
-            error: 'FACEBOOK_ACCESS_TOKEN not configured',
+            error: noTokenError,
             duration_ms: 0,
           };
           await db.execute({
             sql: `INSERT INTO bf_sync_logs (client_id, platform, status, error, duration_ms, triggered_by)
                   VALUES (?, 'meta', 'error', ?, 0, 'cron')`,
-            args: [clientId, 'FACEBOOK_ACCESS_TOKEN not configured'],
+            args: [clientId, noTokenError],
           });
         } else {
           try {
