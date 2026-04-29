@@ -277,18 +277,19 @@ export async function syncMetaForClient(
       .map((c) => [c.meta_campaign_id as string, c]),
   );
 
-  // Look up which existing campaigns already have an open budget period
-  // (end_date IS NULL). If they do, the user has either accepted Meta's
-  // initial value or edited manually — leave their budget alone. If not,
-  // we'll seed one from the Meta value below.
+  // Pull the current open budget period (and its value) per campaign in a
+  // single query. We compare Meta's current daily_budget against this; any
+  // mismatch gets propagated, because Meta is the source of truth.
   const openPeriodResult = await db.execute({
-    sql: `SELECT campaign_id FROM bf_budget_periods
+    sql: `SELECT campaign_id, daily_budget FROM bf_budget_periods
           WHERE end_date IS NULL AND campaign_id IN (
             SELECT id FROM bf_campaigns WHERE client_id = ?
           )`,
     args: [clientId],
   });
-  const hasOpenPeriod = new Set(openPeriodResult.rows.map((r) => r.campaign_id as string));
+  const openPeriodMap = new Map<string, number>(
+    openPeriodResult.rows.map((r) => [r.campaign_id as string, Number(r.daily_budget)]),
+  );
 
   let created = 0;
   let updated = 0;
@@ -381,43 +382,33 @@ export async function syncMetaForClient(
         args: [spend, currentMonth, status, adLink, now.toISOString(), existingId],
       });
 
-      // Budget reconciliation against Meta.
+      // Budget reconciliation: Meta is the source of truth.
       //
-      // We track the *last Meta-reported* daily budget on the campaign row
-      // (meta_daily_budget). On each sync:
-      //   - If Meta reports a budget for the first time → seed a period
-      //     (when none exists) and record the baseline.
-      //   - If Meta's value changed since last sync → close the open period
-      //     and create a new one at Meta's value. This means Meta-side
-      //     changes flow through even if the user previously edited
-      //     manually — manual edits are a stopgap, Meta is the source of
-      //     truth when it moves.
-      //   - If Meta hasn't moved → leave everything alone (manual edits
-      //     stick).
-      // dailyBudget=0 means Meta returned no daily budget (e.g. lifetime
-      // budget) — we don't propagate zero, leave whatever the user has.
+      // Compare Meta's current daily_budget against the value of our
+      // currently-open budget period:
+      //   - No open period yet → seed one from Meta
+      //   - Open period exists with a different value → close it, open a
+      //     new one at Meta's value (this is what flows Meta-side changes
+      //     through; it also overwrites manual edits the next time sync
+      //     runs, so manual edits are effectively temporary)
+      //   - Open period already matches → no-op
+      //
+      // Meta returning 0 (lifetime budget or no budget configured) is a
+      // signal we have nothing to assert, so leave whatever the user has
+      // in place. That makes manual edits the *only* way to set a daily
+      // forecast for lifetime-budget campaigns.
       if (dailyBudget > 0) {
-        const lastMetaBudget =
-          existing.meta_daily_budget !== null && existing.meta_daily_budget !== undefined
-            ? Number(existing.meta_daily_budget)
-            : null;
-
-        if (lastMetaBudget === null) {
-          if (!hasOpenPeriod.has(existingId)) {
-            const seedStart = (existing.start_date as string | null) || todayStr;
-            await seedBudgetPeriod(existingId, mc.name, dailyBudget, seedStart);
-          }
-          await db.execute({
-            sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
-            args: [dailyBudget, existingId],
-          });
-        } else if (dailyBudget !== lastMetaBudget) {
-          await propagateMetaBudgetChange(existingId, mc.name, lastMetaBudget, dailyBudget);
-          await db.execute({
-            sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
-            args: [dailyBudget, existingId],
-          });
+        const currentOpenBudget = openPeriodMap.get(existingId);
+        if (currentOpenBudget === undefined) {
+          const seedStart = (existing.start_date as string | null) || todayStr;
+          await seedBudgetPeriod(existingId, mc.name, dailyBudget, seedStart);
+        } else if (currentOpenBudget !== dailyBudget) {
+          await propagateMetaBudgetChange(existingId, mc.name, currentOpenBudget, dailyBudget);
         }
+        await db.execute({
+          sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
+          args: [dailyBudget, existingId],
+        });
       }
 
       updated++;
