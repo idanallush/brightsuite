@@ -37,18 +37,23 @@ export const ToastContainer = () => {
   if (toasts.length === 0) return null
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-col gap-2">
+    <div className="bf-toast-stack" dir="rtl">
       {toasts.map((t) => (
-        <div key={t.id} className="toast flex items-center gap-3 animate-enter">
-          {t.type === 'success' ? (
-            <CheckCircle size={18} className="text-success" />
-          ) : (
-            <AlertCircle size={18} className="text-danger" />
-          )}
-          <span>{t.message}</span>
+        <div
+          key={t.id}
+          className={`bf-toast bf-toast--${t.type}`}
+          role="status"
+          aria-live={t.type === 'error' ? 'assertive' : 'polite'}
+        >
+          <span className="bf-toast__icon" aria-hidden="true">
+            {t.type === 'success' ? <CheckCircle size={18} /> : <AlertCircle size={18} />}
+          </span>
+          <span className="bf-toast__message">{t.message}</span>
           <button
-            className="btn-icon !w-6 !h-6"
+            type="button"
+            className="bf-toast__close"
             onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+            aria-label="סגור"
           >
             <X size={14} />
           </button>
