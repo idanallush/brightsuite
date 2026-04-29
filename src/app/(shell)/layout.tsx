@@ -7,7 +7,6 @@ import { useAuth } from '@/hooks/use-auth';
 import { Sidebar } from '@/components/shell/sidebar';
 import { Topbar } from '@/components/shell/topbar';
 import { ToastContainer } from '@/components/ui/toast';
-import { Toaster as SonnerToaster } from 'sonner';
 import { useRouteMemory } from '@/hooks/use-route-memory';
 
 /**
@@ -72,13 +71,6 @@ export default function ShellLayout({
           <main className="flex-1 p-4 md:p-6">{children}</main>
         </div>
         <ToastContainer />
-        <SonnerToaster
-          position="bottom-center"
-          dir="rtl"
-          richColors
-          closeButton
-          duration={4500}
-        />
       </div>
     </SWRConfig>
   );
