@@ -196,7 +196,7 @@ export const MonthProgressBar = ({
                   <span className="text-text-muted">.</span>
                   <span className="font-medium">{eventTypeLabels[event.type]}</span>
                   <span className="text-text-muted">.</span>
-                  <span className="text-accent font-semibold">{formatCurrency(event.dailyBudget)}</span>
+                  <span className="font-semibold">{formatCurrency(event.dailyBudget)}</span>
                   <span className="text-text-muted text-[10px]">{formatDate(event.date.toISOString())}</span>
                 </div>
               ))}

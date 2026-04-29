@@ -113,7 +113,7 @@ export const BudgetEditDialog = ({ open, onClose, campaign, clientId }: BudgetEd
             <ArrowLeft size={18} className="text-accent" />
             <div className="text-center">
               <p className="text-xs text-text-muted mb-1">חדש</p>
-              <p className="font-semibold text-accent">{formatCurrency(Number(newBudget))}</p>
+              <p className="font-semibold">{formatCurrency(Number(newBudget))}</p>
             </div>
           </div>
         )}

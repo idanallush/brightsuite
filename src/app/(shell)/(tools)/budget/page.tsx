@@ -44,7 +44,7 @@ const ClientCard = ({ client }: { client: { id: string; name: string; slug: stri
           </div>
           <div className="flex items-center gap-1.5">
             <HelpTip text="התחזית מחושבת לפי התקציב היומי × ימים שנותרו בחודש." position="top" size={13} />
-            <span className="text-2xl font-semibold text-accent">
+            <span className="text-2xl font-semibold">
               {formatCurrency(totalForecast)}
             </span>
           </div>

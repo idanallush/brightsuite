@@ -357,7 +357,7 @@ export const CampaignTable = ({
                         onClick={() => onBudgetEdit(campaign)}
                         title="שינוי תקציב"
                       >
-                        <span className="font-semibold text-accent">
+                        <span className="font-semibold">
                           {formatCurrency(campaign.current_daily_budget)}
                         </span>
                         <Pencil

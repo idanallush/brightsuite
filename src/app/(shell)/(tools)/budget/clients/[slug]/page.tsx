@@ -367,7 +367,7 @@ export default function ClientViewPage() {
             היסטוריית שינויים
           </Button>
           <Button variant="ghost" onClick={copyShareLink}>
-            <Copy size={16} />
+            <Copy size={16} style={{ color: '#2563eb' }} />
             קישור שיתוף
           </Button>
           <Button variant="ghost" onClick={handleSync} disabled={metaSync.isPending}>
@@ -441,7 +441,7 @@ export default function ClientViewPage() {
           </div>
           <div className="text-center py-4 px-3" style={{ borderInlineStart: '1px solid var(--glass-border)' }}>
             <p className="text-xs text-text-muted mb-1">צפי חודשי</p>
-            <p className="text-xl font-semibold text-accent">{formatCurrency(totalForecast)}</p>
+            <p className="text-xl font-semibold">{formatCurrency(totalForecast)}</p>
           </div>
           <div className="text-center py-4 px-3" style={{ borderInlineStart: '1px solid var(--glass-border)' }}>
             <p className="text-xs text-text-muted mb-1">הוצאה בפועל</p>
@@ -466,7 +466,7 @@ export default function ClientViewPage() {
               <p>ימים</p>
             </div>
             <div className="text-center">
-              <p className="font-semibold text-sm text-accent">{daysPassed}</p>
+              <p className="font-semibold text-sm">{daysPassed}</p>
               <p>עברו</p>
             </div>
             <div className="text-center">
@@ -619,7 +619,7 @@ export default function ClientViewPage() {
                     </div>
                     <div className="text-end">
                       <p className="text-xs text-text-muted">צפי חודשי</p>
-                      <p className="text-xl font-semibold text-accent">{formatCurrency(totalForecast)}</p>
+                      <p className="text-xl font-semibold">{formatCurrency(totalForecast)}</p>
                     </div>
                     {totalActualSpend > 0 && (
                       <div className="text-end">
