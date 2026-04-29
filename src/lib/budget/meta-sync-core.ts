@@ -20,6 +20,14 @@ interface MetaCampaign {
   objective: string;
   start_time?: string;
   stop_time?: string;
+  daily_budget?: string;
+  lifetime_budget?: string;
+}
+
+interface MetaAdSet {
+  id: string;
+  status: string;
+  daily_budget?: string;
 }
 
 interface MetaInsight {
@@ -52,7 +60,7 @@ async function fetchCampaignDetails(campaignIds: string[], accessToken: string):
   for (let i = 0; i < campaignIds.length; i += 50) {
     const chunk = campaignIds.slice(i, i + 50);
     const ids = chunk.join(',');
-    const url = `${META_BASE_URL}/?ids=${ids}&fields=id,name,status,objective,start_time,stop_time&access_token=${accessToken}`;
+    const url = `${META_BASE_URL}/?ids=${ids}&fields=id,name,status,objective,start_time,stop_time,daily_budget,lifetime_budget&access_token=${accessToken}`;
     const res = await fetch(url);
     if (!res.ok) {
       const err = await res.json();
@@ -65,6 +73,61 @@ async function fetchCampaignDetails(campaignIds: string[], accessToken: string):
   }
 
   return results;
+}
+
+/**
+ * Returns campaign_id → daily budget in major currency units (₪, $, €).
+ * Meta returns budgets as integer strings in the smallest unit (agorot/cents);
+ * we divide by 100 since every currency BudgetFlow targets has 2 decimals.
+ *
+ * Source order:
+ *   1. campaign.daily_budget (CBO — campaign-level budget)
+ *   2. sum of ACTIVE adsets' daily_budget (ABO — adset-level budgets)
+ *   3. 0 (campaign uses lifetime budget or has none — user can edit manually)
+ */
+async function computeDailyBudgets(
+  campaigns: MetaCampaign[],
+  accessToken: string,
+): Promise<Map<string, number>> {
+  const budgetMap = new Map<string, number>();
+  const needAdsets: string[] = [];
+
+  for (const c of campaigns) {
+    const cbo = Number(c.daily_budget ?? 0);
+    if (cbo > 0) {
+      budgetMap.set(c.id, cbo / 100);
+    } else {
+      needAdsets.push(c.id);
+    }
+  }
+
+  // Fetch adsets in parallel for campaigns without CBO. Meta tolerates ~50
+  // concurrent calls per token; chunk just in case.
+  for (let i = 0; i < needAdsets.length; i += 25) {
+    const chunk = needAdsets.slice(i, i + 25);
+    await Promise.all(
+      chunk.map(async (campaignId) => {
+        try {
+          const url = `${META_BASE_URL}/${campaignId}/adsets?fields=id,status,daily_budget&limit=200&access_token=${accessToken}`;
+          const res = await fetch(url);
+          if (!res.ok) {
+            budgetMap.set(campaignId, 0);
+            return;
+          }
+          const data = await res.json() as { data?: MetaAdSet[] };
+          const adsets = data.data ?? [];
+          const sum = adsets
+            .filter((a) => a.status === 'ACTIVE')
+            .reduce((acc, a) => acc + (Number(a.daily_budget) || 0), 0);
+          budgetMap.set(campaignId, sum / 100);
+        } catch {
+          budgetMap.set(campaignId, 0);
+        }
+      }),
+    );
+  }
+
+  return budgetMap;
 }
 
 async function fetchTopAdLink(
@@ -111,7 +174,7 @@ async function fetchTopAdLink(
 }
 
 async function fetchActiveCampaigns(adAccountId: string, accessToken: string): Promise<MetaCampaign[]> {
-  const url = `${META_BASE_URL}/${adAccountId}/campaigns?fields=id,name,status,objective,start_time,stop_time&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=500&access_token=${accessToken}`;
+  const url = `${META_BASE_URL}/${adAccountId}/campaigns?fields=id,name,status,objective,start_time,stop_time,daily_budget,lifetime_budget&filtering=[{"field":"effective_status","operator":"IN","value":["ACTIVE"]}]&limit=500&access_token=${accessToken}`;
   const res = await fetch(url);
   if (!res.ok) {
     console.warn('Failed to fetch active campaigns:', await res.text());
@@ -202,6 +265,8 @@ export async function syncMetaForClient(
     };
   }
 
+  const dailyBudgetMap = await computeDailyBudgets(metaCampaigns, accessToken);
+
   const existingResult = await db.execute({
     sql: 'SELECT * FROM bf_campaigns WHERE client_id = ?',
     args: [clientId],
@@ -212,15 +277,52 @@ export async function syncMetaForClient(
       .map((c) => [c.meta_campaign_id as string, c]),
   );
 
+  // Look up which existing campaigns already have an open budget period
+  // (end_date IS NULL). If they do, the user has either accepted Meta's
+  // initial value or edited manually — leave their budget alone. If not,
+  // we'll seed one from the Meta value below.
+  const openPeriodResult = await db.execute({
+    sql: `SELECT campaign_id FROM bf_budget_periods
+          WHERE end_date IS NULL AND campaign_id IN (
+            SELECT id FROM bf_campaigns WHERE client_id = ?
+          )`,
+    args: [clientId],
+  });
+  const hasOpenPeriod = new Set(openPeriodResult.rows.map((r) => r.campaign_id as string));
+
   let created = 0;
   let updated = 0;
 
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  const seedBudgetPeriod = async (
+    campaignId: string,
+    campaignName: string,
+    dailyBudget: number,
+    startDate: string,
+  ) => {
+    if (dailyBudget <= 0) return;
+    await db.execute({
+      sql: `INSERT INTO bf_budget_periods (campaign_id, daily_budget, start_date, created_by)
+            VALUES (?, ?, ?, 'Meta Sync')`,
+      args: [campaignId, dailyBudget, startDate],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by)
+            VALUES (?, 'budget_change', ?, ?, 'Meta Sync')`,
+      args: [
+        campaignId,
+        `תקציב יומי סונכרן מ-Meta: ₪${dailyBudget} — ${campaignName}`,
+        String(dailyBudget),
+      ],
+    });
+  };
+
   for (const mc of metaCampaigns) {
     const spend = spendMap.get(mc.id) ?? 0;
     const status = mapMetaStatus(mc.status, mc.start_time);
     const existing = metaIdMap.get(mc.id);
+    const dailyBudget = dailyBudgetMap.get(mc.id) ?? 0;
 
     // Honor manual dismissals: user clicked the trash on this campaign,
     // skip it entirely so we don't re-create it AND don't refresh its data.
@@ -231,10 +333,19 @@ export async function syncMetaForClient(
     const adLink = await fetchTopAdLink(mc.id, accountId, accessToken, monthStart, todayStr);
 
     if (existing) {
+      const existingId = existing.id as string;
       await db.execute({
         sql: `UPDATE bf_campaigns SET actual_spend = ?, actual_spend_month = ?, status = ?, ad_link = ?, last_synced_at = ? WHERE id = ?`,
-        args: [spend, currentMonth, status, adLink, now.toISOString(), existing.id as string],
+        args: [spend, currentMonth, status, adLink, now.toISOString(), existingId],
       });
+
+      // Seed a budget period for previously-synced campaigns that never had one.
+      // Manual edits (= an existing open period) are preserved.
+      if (!hasOpenPeriod.has(existingId)) {
+        const seedStart = (existing.start_date as string | null) || todayStr;
+        await seedBudgetPeriod(existingId, mc.name, dailyBudget, seedStart);
+      }
+
       updated++;
     } else {
       const startDate = mc.start_time ? mc.start_time.split('T')[0] : todayStr;
@@ -260,12 +371,15 @@ export async function syncMetaForClient(
       });
 
       const newCampaign = newCampaignResult.rows[0];
+      const newCampaignId = newCampaign.id as string;
 
       await db.execute({
         sql: `INSERT INTO bf_changelog (campaign_id, action, description, performed_by)
               VALUES (?, 'campaign_added', ?, 'Meta Sync')`,
-        args: [newCampaign.id as string, `קמפיין סונכרן מ-Meta: ${mc.name}`],
+        args: [newCampaignId, `קמפיין סונכרן מ-Meta: ${mc.name}`],
       });
+
+      await seedBudgetPeriod(newCampaignId, mc.name, dailyBudget, startDate);
 
       created++;
     }

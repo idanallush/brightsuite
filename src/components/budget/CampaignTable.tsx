@@ -389,7 +389,7 @@ export const CampaignTable = ({
                             href={campaign.ad_link}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn-icon !w-8 !h-8 !text-accent hover:!bg-[rgba(37,99,235,0.15)]"
+                            className="btn-icon !w-8 !h-8 !text-[#2563eb] hover:!bg-[rgba(37,99,235,0.15)]"
                             title="צפה במודעה"
                           >
                             <ExternalLink size={15} />
