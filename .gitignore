@@ -44,3 +44,6 @@ next-env.d.ts
 
 # migration backups (DB snapshots, may contain sensitive data)
 /scripts/backups/
+
+# claude code worktrees and local state
+.claude/worktrees/
