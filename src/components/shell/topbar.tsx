@@ -26,7 +26,14 @@ const labelMap: Record<string, string> = {
 };
 
 function getSegmentLabel(segment: string): string {
-  return labelMap[segment] || segment;
+  if (labelMap[segment]) return labelMap[segment];
+  // Dynamic slug — decode URI-encoded Hebrew/Arabic so the breadcrumb
+  // shows "שנקר-הנדסאים" instead of "%D7%A9%D7%A0..." gibberish.
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
 }
 
 export const Topbar = () => {
