@@ -84,6 +84,7 @@ export async function syncGoogleForClient(
       campaign.id,
       campaign.name,
       campaign.status,
+      campaign_budget.amount_micros,
       metrics.cost_micros,
       metrics.impressions
     FROM campaign
@@ -101,17 +102,24 @@ export async function syncGoogleForClient(
     endDate: string | null;
     totalCostMicros: number;
     totalImpressions: number;
+    dailyBudgetMicros: number;
   }>();
 
   for (const row of rows) {
     const c = row.campaign as Record<string, string>;
     const m = row.metrics as Record<string, string>;
+    const b = row.campaignBudget as Record<string, string> | undefined;
     const cId = c.id;
+    const budgetMicros = Number(b?.amountMicros || 0);
 
     const existing = campaignMap.get(cId);
     if (existing) {
       existing.totalCostMicros += Number(m.costMicros || 0);
       existing.totalImpressions += Number(m.impressions || 0);
+      // budget is constant across rows; keep the first non-zero we saw
+      if (existing.dailyBudgetMicros === 0 && budgetMicros > 0) {
+        existing.dailyBudgetMicros = budgetMicros;
+      }
     } else {
       campaignMap.set(cId, {
         id: cId,
@@ -121,6 +129,7 @@ export async function syncGoogleForClient(
         endDate: null,
         totalCostMicros: Number(m.costMicros || 0),
         totalImpressions: Number(m.impressions || 0),
+        dailyBudgetMicros: budgetMicros,
       });
     }
   }
@@ -135,35 +144,131 @@ export async function syncGoogleForClient(
       .map((c) => [c.meta_campaign_id as string, c]),
   );
 
+  // Open budget period per campaign — used to detect Google-side budget
+  // changes and propagate them. Same pattern as the Meta sync.
+  const openPeriodResult = await db.execute({
+    sql: `SELECT campaign_id, daily_budget FROM bf_budget_periods
+          WHERE end_date IS NULL AND campaign_id IN (
+            SELECT id FROM bf_campaigns WHERE client_id = ?
+          )`,
+    args: [clientId],
+  });
+  const openPeriodMap = new Map<string, number>(
+    openPeriodResult.rows.map((r) => [r.campaign_id as string, Number(r.daily_budget)]),
+  );
+
   let created = 0;
   let updated = 0;
 
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+  const seedBudgetPeriod = async (
+    campaignId: string,
+    campaignName: string,
+    dailyBudget: number,
+    startDate: string,
+  ) => {
+    if (dailyBudget <= 0) return;
+    await db.execute({
+      sql: `INSERT INTO bf_budget_periods (campaign_id, daily_budget, start_date, created_by)
+            VALUES (?, ?, ?, 'Google Sync')`,
+      args: [campaignId, dailyBudget, startDate],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_changelog (campaign_id, action, description, new_value, performed_by)
+            VALUES (?, 'budget_change', ?, ?, 'Google Sync')`,
+      args: [
+        campaignId,
+        `תקציב יומי סונכרן מ-Google Ads: ₪${dailyBudget} — ${campaignName}`,
+        String(dailyBudget),
+      ],
+    });
+  };
+
+  const propagateGoogleBudgetChange = async (
+    campaignId: string,
+    campaignName: string,
+    oldBudget: number,
+    newBudget: number,
+  ) => {
+    await db.execute({
+      sql: `UPDATE bf_budget_periods SET end_date = ?
+            WHERE campaign_id = ? AND end_date IS NULL`,
+      args: [yesterdayStr, campaignId],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_budget_periods (campaign_id, daily_budget, start_date, created_by)
+            VALUES (?, ?, ?, 'Google Sync')`,
+      args: [campaignId, newBudget, today],
+    });
+    await db.execute({
+      sql: `INSERT INTO bf_changelog (campaign_id, action, description, old_value, new_value, performed_by)
+            VALUES (?, 'budget_change', ?, ?, ?, 'Google Sync')`,
+      args: [
+        campaignId,
+        `תקציב סונכרן מ-Google Ads: ₪${oldBudget} → ₪${newBudget} — ${campaignName}`,
+        String(oldBudget),
+        String(newBudget),
+      ],
+    });
+  };
+
   for (const [, gc] of campaignMap) {
     const spend = Math.round((gc.totalCostMicros / 1_000_000) * 100) / 100;
+    const dailyBudget = gc.dailyBudgetMicros > 0
+      ? Math.round((gc.dailyBudgetMicros / 1_000_000) * 100) / 100
+      : 0;
     const status = mapGoogleStatus(gc.status);
     const googleAdLink = `https://ads.google.com/aw/campaigns?campaignId=${gc.id}&ocid=${customerId}`;
 
     const existing = googleIdMap.get(gc.id);
 
-    // Skip campaigns the user manually dismissed.
+    // Same dismissal handling as Meta: stale/old campaigns stay dismissed,
+    // but a dismissed campaign that has actual current-month spend gets
+    // un-dismissed (the user removed a live campaign by mistake).
     if (existing && existing.dismissed_at) {
-      continue;
+      if (spend <= 0) continue;
+      await db.execute({
+        sql: 'UPDATE bf_campaigns SET dismissed_at = NULL WHERE id = ?',
+        args: [existing.id as string],
+      });
+      existing.dismissed_at = null;
     }
 
     if (existing) {
+      const existingId = existing.id as string;
       await db.execute({
         sql: `UPDATE bf_campaigns SET actual_spend = ?, actual_spend_month = ?, status = ?, ad_link = ?, last_synced_at = ? WHERE id = ?`,
-        args: [spend, currentMonth, status, googleAdLink, now.toISOString(), existing.id as string],
+        args: [spend, currentMonth, status, googleAdLink, now.toISOString(), existingId],
       });
+
+      // Budget reconciliation — Google is the source of truth, mirror the
+      // Meta sync logic. See meta-sync-core for the full rationale.
+      if (dailyBudget > 0) {
+        const currentOpenBudget = openPeriodMap.get(existingId);
+        if (currentOpenBudget === undefined) {
+          const seedStart = (existing.start_date as string | null) || today;
+          await seedBudgetPeriod(existingId, gc.name, dailyBudget, seedStart);
+        } else if (currentOpenBudget !== dailyBudget) {
+          await propagateGoogleBudgetChange(existingId, gc.name, currentOpenBudget, dailyBudget);
+        }
+        await db.execute({
+          sql: 'UPDATE bf_campaigns SET meta_daily_budget = ? WHERE id = ?',
+          args: [dailyBudget, existingId],
+        });
+      }
+
       updated++;
     } else {
       const startDate = today;
 
       const newCampaignResult = await db.execute({
-        sql: `INSERT INTO bf_campaigns (client_id, name, technical_name, platform, campaign_type, meta_campaign_id, actual_spend, actual_spend_month, status, start_date, end_date, ad_link, last_synced_at)
-              VALUES (?, ?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        sql: `INSERT INTO bf_campaigns (client_id, name, technical_name, platform, campaign_type, meta_campaign_id, actual_spend, actual_spend_month, status, start_date, end_date, ad_link, last_synced_at, meta_daily_budget)
+              VALUES (?, ?, ?, 'google', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
         args: [
           clientId,
           gc.name,
@@ -177,16 +282,20 @@ export async function syncGoogleForClient(
           gc.endDate,
           googleAdLink,
           now.toISOString(),
+          dailyBudget > 0 ? dailyBudget : null,
         ],
       });
 
       const newCampaign = newCampaignResult.rows[0];
+      const newCampaignId = newCampaign.id as string;
 
       await db.execute({
         sql: `INSERT INTO bf_changelog (campaign_id, action, description, performed_by)
               VALUES (?, 'campaign_added', ?, 'Google Sync')`,
-        args: [newCampaign.id as string, `קמפיין סונכרן מ-Google Ads: ${gc.name}`],
+        args: [newCampaignId, `קמפיין סונכרן מ-Google Ads: ${gc.name}`],
       });
+
+      await seedBudgetPeriod(newCampaignId, gc.name, dailyBudget, startDate);
 
       created++;
     }
