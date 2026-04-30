@@ -7,6 +7,16 @@ export const getDaysInMonth = (year: number, month: number): number => {
   return new Date(year, month + 1, 0).getDate()
 }
 
+// Parse 'YYYY-MM-DD' as LOCAL midnight. `new Date('YYYY-MM-DD')` parses as
+// UTC midnight, which silently drifts by the local TZ offset and breaks
+// same-day comparisons against `new Date(year, month, day)` (local midnight).
+// Concretely: on the last day of a month in any UTC+ zone, today's period
+// would be filtered out as "after monthEnd" and render as ₪0.
+const parseLocalDate = (str: string): Date => {
+  const [y, m, d] = str.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
 /**
  * Calculate how many days a budget period overlaps with a given month.
  */
@@ -16,8 +26,8 @@ const getOverlapDays = (
   monthStart: Date,
   monthEnd: Date
 ): number => {
-  const pStart = new Date(periodStart)
-  const pEnd = periodEnd ? new Date(periodEnd) : monthEnd
+  const pStart = parseLocalDate(periodStart)
+  const pEnd = periodEnd ? parseLocalDate(periodEnd) : monthEnd
 
   const overlapStart = pStart > monthStart ? pStart : monthStart
   const overlapEnd = pEnd < monthEnd ? pEnd : monthEnd
@@ -54,13 +64,13 @@ export const calculateMonthlyForecast = (
   // Filter periods that overlap with this month
   const relevantPeriods = budgetPeriods
     .filter((p) => {
-      const pStart = new Date(p.start_date)
-      const pEnd = p.end_date ? new Date(p.end_date) : monthEnd
+      const pStart = parseLocalDate(p.start_date)
+      const pEnd = p.end_date ? parseLocalDate(p.end_date) : monthEnd
 
       // Period must overlap with the month
       return pStart <= monthEnd && pEnd >= monthStart
     })
-    .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime())
+    .sort((a, b) => parseLocalDate(a.start_date).getTime() - parseLocalDate(b.start_date).getTime())
 
   if (relevantPeriods.length === 0) {
     return {
@@ -74,7 +84,7 @@ export const calculateMonthlyForecast = (
   }
 
   // Campaign effective end = min(campaign.end_date, monthEnd)
-  const campaignEnd = campaign.end_date ? new Date(campaign.end_date) : null
+  const campaignEnd = campaign.end_date ? parseLocalDate(campaign.end_date) : null
   const effectiveEnd = campaignEnd && campaignEnd < monthEnd ? campaignEnd : monthEnd
 
   // Calculate total monthly forecast
@@ -107,7 +117,7 @@ export const calculateMonthlyForecast = (
 
   // Current daily budget = the latest active period
   const currentPeriod = relevantPeriods
-    .filter((p) => !p.end_date || new Date(p.end_date) >= today)
+    .filter((p) => !p.end_date || parseLocalDate(p.end_date) >= today)
     .pop()
   const currentDailyBudget = currentPeriod?.daily_budget ?? 0
 
@@ -120,15 +130,11 @@ export const calculateMonthlyForecast = (
 
   // Original plan = first period's daily x total days in month
   const firstPeriod = relevantPeriods[0]
-  const campaignStartInMonth = new Date(campaign.start_date) > monthStart
-    ? new Date(campaign.start_date)
-    : monthStart
-  const originalDays = getOverlapDays(
-    campaignStartInMonth.toISOString().split('T')[0],
-    effectiveEnd.toISOString().split('T')[0],
-    monthStart,
-    effectiveEnd
-  )
+  const campaignStart = parseLocalDate(campaign.start_date)
+  const campaignStartInMonth = campaignStart > monthStart ? campaignStart : monthStart
+  const originalDays = campaignStartInMonth > effectiveEnd
+    ? 0
+    : Math.floor((effectiveEnd.getTime() - campaignStartInMonth.getTime()) / (1000 * 60 * 60 * 24)) + 1
   const originalPlan = firstPeriod.daily_budget * originalDays
 
   return {
