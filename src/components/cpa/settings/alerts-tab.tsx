@@ -86,8 +86,68 @@ export function AlertsTab() {
     }
   }, [configRaw, configs]);
 
+  function validateForm(): { ok: boolean; errors: string[] } {
+    const errors: string[] = [];
+
+    if (Number.isNaN(thresholdPercent) || thresholdPercent <= 0 || thresholdPercent > 500) {
+      errors.push("אחוז הסף חייב להיות מספר בין 1 ל-500");
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emails = emailRecipients
+      .split(",")
+      .map((e) => e.trim())
+      .filter(Boolean);
+    const invalidEmails = emails.filter((e) => !emailRegex.test(e));
+    if (invalidEmails.length > 0) {
+      errors.push(`כתובות מייל לא תקינות: ${invalidEmails.join(", ")}`);
+    }
+
+    if (slackWebhookUrl.trim()) {
+      const url = slackWebhookUrl.trim();
+      if (!url.startsWith("https://")) {
+        errors.push("Slack Webhook חייב להתחיל ב-https://");
+      } else {
+        try {
+          new URL(url);
+        } catch {
+          errors.push("Slack Webhook אינו כתובת URL תקינה");
+        }
+      }
+    }
+
+    if (telegramChatId.trim()) {
+      const url = telegramChatId.trim();
+      if (!url.startsWith("https://")) {
+        errors.push("Telegram Webhook חייב להתחיל ב-https://");
+      } else {
+        try {
+          new URL(url);
+        } catch {
+          errors.push("Telegram Webhook אינו כתובת URL תקינה");
+        }
+      }
+    }
+
+    return { ok: errors.length === 0, errors };
+  }
+
   async function handleSave() {
     if (!selectedClientId) return;
+
+    const { ok, errors } = validateForm();
+    if (!ok) {
+      toast.error(errors.join(" • "));
+      return;
+    }
+
+    if (slackWebhookUrl.trim() && !slackWebhookUrl.trim().startsWith("https://hooks.slack.com/services/")) {
+      toast.warning("כתובת ה-Slack Webhook אינה בפורמט הצפוי (https://hooks.slack.com/services/...)");
+    }
+    if (telegramChatId.trim() && !telegramChatId.trim().startsWith("https://api.telegram.org/bot")) {
+      toast.warning("כתובת ה-Telegram Webhook אינה בפורמט הצפוי (https://api.telegram.org/bot...)");
+    }
+
     setSaving(true);
     try {
       const emails = emailRecipients
@@ -193,7 +253,15 @@ export function AlertsTab() {
                 id="threshold"
                 type="number"
                 value={thresholdPercent}
-                onChange={(e) => setThresholdPercent(parseFloat(e.target.value) || 0)}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === "") {
+                    setThresholdPercent(20);
+                    return;
+                  }
+                  const parsed = parseFloat(v);
+                  setThresholdPercent(Number.isNaN(parsed) ? 20 : parsed);
+                }}
                 placeholder="20"
                 className="w-32 bg-neutral-50"
               />
@@ -207,7 +275,15 @@ export function AlertsTab() {
                 onChange={(e) => setEmailRecipients(e.target.value)}
                 placeholder="user1@example.com, user2@example.com"
                 rows={3}
-                className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className={`flex w-full rounded-lg border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                  emailRecipients
+                    .split(",")
+                    .map((e) => e.trim())
+                    .filter(Boolean)
+                    .some((e) => !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e))
+                    ? "border-red-500"
+                    : "border-input"
+                }`}
               />
             </div>
 
