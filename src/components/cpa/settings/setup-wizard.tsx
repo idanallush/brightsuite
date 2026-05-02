@@ -592,6 +592,7 @@ export function SetupWizard({ open, onOpenChange }: SetupWizardProps) {
                               size="icon"
                               className="h-8 w-8 text-[#c0392b] hover:bg-[#fceaea]"
                               onClick={() => removeTopicDraft(topic._index)}
+                              aria-label="הסר נושא"
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>

@@ -269,6 +269,7 @@ export function ClientCardMulti({ data, isCollapsed, onToggleCollapse, onHide }:
                     onHide();
                   }}
                   className="text-muted-foreground hover:text-red-500 transition-colors p-0.5"
+                  aria-label="הסתר לקוח"
                 >
                   <EyeOff className="h-3.5 w-3.5" />
                 </button>

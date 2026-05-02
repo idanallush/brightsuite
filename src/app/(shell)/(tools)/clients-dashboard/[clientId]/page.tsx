@@ -1,7 +1,7 @@
 'use client';
 
 import '../styles.css';
-import { useState, use } from 'react';
+import { useState, use, useRef, type KeyboardEvent } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid, Archive } from 'lucide-react';
@@ -82,6 +82,7 @@ export default function ClientDetailPage({
   const [savingType, setSavingType] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   async function handleRestore() {
     if (!client || restoring) return;
@@ -101,6 +102,31 @@ export default function ClientDetailPage({
     } finally {
       setRestoring(false);
     }
+  }
+
+  function handleTabKeyDown(event: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const last = TABS.length - 1;
+    let nextIndex: number | null = null;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = index === 0 ? last : index - 1;
+        break;
+      case 'ArrowLeft':
+        nextIndex = index === last ? 0 : index + 1;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = last;
+        break;
+      default:
+        return;
+    }
+    event.preventDefault();
+    const next = TABS[nextIndex];
+    setTab(next.id);
+    tabRefs.current[nextIndex]?.focus();
   }
 
   async function handleMetricTypeChange(next: MetricType) {
@@ -255,14 +281,25 @@ export default function ClientDetailPage({
         />
       </div>
 
-      <div className="cd-tabs">
-        {TABS.map((t) => {
+      <div className="cd-tabs" role="tablist" aria-label="טאבים של לקוח">
+        {TABS.map((t, index) => {
           const Icon = t.icon;
+          const isActive = tab === t.id;
           return (
             <button
               key={t.id}
-              className={`cd-tab${tab === t.id ? ' cd-tab--active' : ''}`}
+              ref={(el) => {
+                tabRefs.current[index] = el;
+              }}
+              role="tab"
+              type="button"
+              id={`cd-tab-${t.id}`}
+              aria-selected={isActive}
+              aria-controls={`cd-tabpanel-${t.id}`}
+              tabIndex={isActive ? 0 : -1}
+              className={`cd-tab${isActive ? ' cd-tab--active' : ''}`}
               onClick={() => setTab(t.id)}
+              onKeyDown={(event) => handleTabKeyDown(event, index)}
             >
               <Icon size={14} />
               {t.label}
@@ -271,11 +308,17 @@ export default function ClientDetailPage({
         })}
       </div>
 
-      {tab === 'campaigns' && <CampaignsTab client={client} />}
-      {tab === 'creative' && <CreativeTab client={client} />}
-      {tab === 'history' && <HistoryTab client={client} />}
-      {tab === 'alerts' && <AlertsTab client={client} />}
-      {tab === 'views' && <ViewsTab client={client} />}
+      <div
+        role="tabpanel"
+        id={`cd-tabpanel-${tab}`}
+        aria-labelledby={`cd-tab-${tab}`}
+      >
+        {tab === 'campaigns' && <CampaignsTab client={client} />}
+        {tab === 'creative' && <CreativeTab client={client} />}
+        {tab === 'history' && <HistoryTab client={client} />}
+        {tab === 'alerts' && <AlertsTab client={client} />}
+        {tab === 'views' && <ViewsTab client={client} />}
+      </div>
     </div>
   );
 }

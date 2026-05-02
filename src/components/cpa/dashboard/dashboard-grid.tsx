@@ -501,6 +501,7 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
                       <button
                         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity"
                         onClick={() => deleteView(view.id)}
+                        aria-label="מחק תצוגה"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>

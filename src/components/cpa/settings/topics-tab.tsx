@@ -568,6 +568,7 @@ export function TopicsTab() {
                           variant="destructive"
                           size="icon"
                           disabled={deletingId === draft.id}
+                          aria-label="מחק נושא"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -598,6 +599,7 @@ export function TopicsTab() {
                       variant="destructive"
                       size="icon"
                       onClick={() => removeDraftAtIndex(index)}
+                      aria-label="הסר נושא"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>

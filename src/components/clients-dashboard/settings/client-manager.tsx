@@ -663,6 +663,7 @@ export const ClientManager = () => {
                             className="p-1.5 rounded-md transition-colors"
                             style={{ background: '#c0392b', color: '#fff' }}
                             title="אישור העברה לארכיון"
+                            aria-label="אישור העברה לארכיון"
                           >
                             <Check size={14} />
                           </button>
@@ -671,6 +672,7 @@ export const ClientManager = () => {
                             className="p-1.5 rounded-md border transition-colors"
                             style={{ borderColor: 'var(--glass-border)', color: 'var(--text-secondary)' }}
                             title="ביטול"
+                            aria-label="ביטול"
                           >
                             <X size={14} />
                           </button>
@@ -682,6 +684,7 @@ export const ClientManager = () => {
                             className="p-1.5 rounded-md transition-colors hover:opacity-80"
                             style={{ color: 'var(--text-secondary)' }}
                             title="עריכה"
+                            aria-label="עריכה"
                           >
                             <Pencil size={14} />
                           </button>
@@ -690,6 +693,7 @@ export const ClientManager = () => {
                             className="p-1.5 rounded-md transition-colors hover:opacity-80"
                             style={{ color: '#c0392b' }}
                             title="העבר לארכיון"
+                            aria-label="העבר לארכיון"
                           >
                             <Trash2 size={14} />
                           </button>
