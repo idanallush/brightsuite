@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { Pencil, Plus, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ClientSummary } from '@/lib/clients-dashboard/types';
 
@@ -44,6 +45,9 @@ interface HistorySeriesPoint {
 
 interface HistoryResponse {
   changes: HistoryChange[];
+  total: number;
+  page: number;
+  pageSize: number;
   series: HistorySeriesPoint[];
   campaigns: HistoryCampaign[];
   range: { startDate: string; endDate: string };
@@ -63,22 +67,71 @@ const FIELD_LABEL: Record<string, string> = {
   objective: 'יעד',
 };
 
+const PAGE_SIZE_OPTIONS = [50, 100, 200] as const;
+const DEFAULT_PAGE_SIZE = 100;
+
+function parsePage(raw: string | null): number {
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 1;
+}
+
+function parsePageSize(raw: string | null): number {
+  const n = Number(raw);
+  if (Number.isFinite(n) && PAGE_SIZE_OPTIONS.includes(n as (typeof PAGE_SIZE_OPTIONS)[number])) {
+    return n;
+  }
+  return DEFAULT_PAGE_SIZE;
+}
+
 export default function HistoryTab({ client }: HistoryTabProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [campaignId, setCampaignId] = useState<string>('');
   const [showNoteFor, setShowNoteFor] = useState<number | null>(null);
   const [addingForCampaign, setAddingForCampaign] = useState<number | null>(null);
 
+  const [page, setPage] = useState<number>(() => parsePage(searchParams.get('page')));
+  const [pageSize, setPageSize] = useState<number>(() => parsePageSize(searchParams.get('pageSize')));
+
+  // Sync page/pageSize back to the URL (same pattern as cpa/page.tsx).
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (page === 1) params.delete('page');
+    else params.set('page', String(page));
+    if (pageSize === DEFAULT_PAGE_SIZE) params.delete('pageSize');
+    else params.set('pageSize', String(pageSize));
+    const qs = params.toString();
+    router.replace(qs ? `?${qs}` : '?', { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize]);
+
   const url = useMemo(() => {
-    const params = new URLSearchParams({ clientId: String(client.id) });
+    const params = new URLSearchParams({
+      clientId: String(client.id),
+      page: String(page),
+      pageSize: String(pageSize),
+    });
     if (campaignId) params.set('campaignId', campaignId);
     return `/api/clients-dashboard/history?${params.toString()}`;
-  }, [client.id, campaignId]);
+  }, [client.id, campaignId, page, pageSize]);
 
   const { data, isLoading, mutate } = useSWR<HistoryResponse>(url, fetcher);
 
-  const series = data?.series ?? [];
-  const monthly = useMemo(() => aggregateMonthly(series), [series]);
-  const isEcom = client.metricType === 'ecommerce';
+  const total = data?.total ?? 0;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+
+  const handleCampaignChange = useCallback((value: string) => {
+    setCampaignId(value);
+    setPage(1);
+  }, []);
+
+  const handlePageSizeChange = useCallback((value: number) => {
+    setPageSize(value);
+    setPage(1);
+  }, []);
 
   const submitNote = async (cmpId: number, note: string) => {
     const trimmed = note.trim();
@@ -114,7 +167,7 @@ export default function HistoryTab({ client }: HistoryTabProps) {
           <select
             className="cd-select"
             value={campaignId}
-            onChange={(e) => setCampaignId(e.target.value)}
+            onChange={(e) => handleCampaignChange(e.target.value)}
           >
             <option value="">כל הקמפיינים</option>
             {(data?.campaigns ?? []).map((c) => (
@@ -147,8 +200,6 @@ export default function HistoryTab({ client }: HistoryTabProps) {
           }}
         />
       )}
-
-      <MonthlyChart data={monthly} isEcom={isEcom} currency={client.currency} />
 
       <div className="cd-history-timeline">
         <div className="cd-history-timeline__head">
@@ -190,203 +241,56 @@ export default function HistoryTab({ client }: HistoryTabProps) {
             ))}
           </div>
         )}
-      </div>
-    </div>
-  );
-}
 
-// ============================================================
-// Monthly chart (plain SVG — no charting libs)
-// ============================================================
-
-interface MonthlyPoint {
-  month: string; // YYYY-MM
-  spend: number;
-  conversions: number;
-  revenue: number;
-}
-
-function aggregateMonthly(series: HistorySeriesPoint[]): MonthlyPoint[] {
-  const map = new Map<string, MonthlyPoint>();
-  for (const p of series) {
-    const month = p.date.slice(0, 7);
-    const cur = map.get(month) ?? { month, spend: 0, conversions: 0, revenue: 0 };
-    cur.spend += p.spend;
-    cur.conversions += p.conversions;
-    cur.revenue += p.revenue;
-    map.set(month, cur);
-  }
-  return [...map.values()].sort((a, b) => a.month.localeCompare(b.month));
-}
-
-function MonthlyChart({
-  data,
-  isEcom,
-  currency,
-}: {
-  data: MonthlyPoint[];
-  isEcom: boolean;
-  currency: string;
-}) {
-  const W = 720;
-  const H = 220;
-  const padL = 56;
-  const padR = 56;
-  const padT = 18;
-  const padB = 30;
-  const innerW = W - padL - padR;
-  const innerH = H - padT - padB;
-
-  if (data.length === 0) {
-    return (
-      <div className="cd-history-chart">
-        <div className="cd-history-chart__head">
-          <h3>גרף חודשי — הוצאה ו{isEcom ? 'הכנסה' : 'המרות'}</h3>
-        </div>
-        <div className="cd-empty">אין נתונים בטווח שנבחר.</div>
-      </div>
-    );
-  }
-
-  const spendMax = Math.max(1, ...data.map((d) => d.spend));
-  const secondaryKey: keyof MonthlyPoint = isEcom ? 'revenue' : 'conversions';
-  const secondaryMax = Math.max(1, ...data.map((d) => d[secondaryKey] as number));
-
-  const barW = innerW / data.length;
-  const barInner = Math.max(8, barW * 0.55);
-
-  const linePoints = data
-    .map((d, i) => {
-      const x = padL + i * barW + barW / 2;
-      const v = d[secondaryKey] as number;
-      const y = padT + innerH - (v / secondaryMax) * innerH;
-      return `${x},${y}`;
-    })
-    .join(' ');
-
-  return (
-    <div className="cd-history-chart">
-      <div className="cd-history-chart__head">
-        <h3>גרף חודשי — הוצאה ו{isEcom ? 'הכנסה' : 'המרות'}</h3>
-        <div className="cd-history-chart__legend">
-          <span className="cd-history-chart__legend-item">
-            <span className="cd-history-chart__swatch cd-history-chart__swatch--bar" />
-            הוצאה ({currency})
-          </span>
-          <span className="cd-history-chart__legend-item">
-            <span className="cd-history-chart__swatch cd-history-chart__swatch--line" />
-            {isEcom ? `הכנסה (${currency})` : 'המרות'}
-          </span>
-        </div>
-      </div>
-      <svg
-        className="cd-history-chart__svg"
-        viewBox={`0 0 ${W} ${H}`}
-        preserveAspectRatio="xMidYMid meet"
-        role="img"
-      >
-        {/* gridlines */}
-        {[0, 0.25, 0.5, 0.75, 1].map((t) => {
-          const y = padT + innerH * (1 - t);
-          return (
-            <line
-              key={t}
-              x1={padL}
-              x2={W - padR}
-              y1={y}
-              y2={y}
-              stroke="rgba(0,0,0,0.06)"
-              strokeWidth={1}
-            />
-          );
-        })}
-        {/* bars */}
-        {data.map((d, i) => {
-          const h = (d.spend / spendMax) * innerH;
-          const x = padL + i * barW + (barW - barInner) / 2;
-          const y = padT + innerH - h;
-          return (
-            <g key={d.month}>
-              <rect
-                x={x}
-                y={y}
-                width={barInner}
-                height={h}
-                fill="var(--accent)"
-                rx={3}
-              />
-              <text
-                x={padL + i * barW + barW / 2}
-                y={H - 10}
-                textAnchor="middle"
-                fontSize={11}
-                fill="var(--text-tertiary)"
+        <div className="cd-history-pagination">
+          <div className="cd-history-pagination__count">
+            {total === 0
+              ? 'אין רשומות'
+              : `מציג ${rangeStart}–${rangeEnd} מתוך ${total}`}
+          </div>
+          <div className="cd-history-pagination__controls">
+            <label className="cd-history-pagination__page-size">
+              לעמוד:
+              <select
+                className="cd-select"
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
               >
-                {formatMonthLabel(d.month)}
-              </text>
-            </g>
-          );
-        })}
-        {/* secondary line */}
-        <polyline
-          points={linePoints}
-          fill="none"
-          stroke="#0369a1"
-          strokeWidth={2}
-        />
-        {data.map((d, i) => {
-          const x = padL + i * barW + barW / 2;
-          const v = d[secondaryKey] as number;
-          const y = padT + innerH - (v / secondaryMax) * innerH;
-          return <circle key={d.month + 'p'} cx={x} cy={y} r={3} fill="#0369a1" />;
-        })}
-        {/* y axis (left) — spend */}
-        {[0, 0.5, 1].map((t) => {
-          const y = padT + innerH * (1 - t);
-          return (
-            <text
-              key={`yl-${t}`}
-              x={padL - 6}
-              y={y + 3}
-              textAnchor="end"
-              fontSize={10}
-              fill="var(--text-tertiary)"
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              type="button"
+              className="cd-alert-btn"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1 || isLoading}
+              aria-label="העמוד הקודם"
             >
-              {abbr(spendMax * t)}
-            </text>
-          );
-        })}
-        {/* y axis (right) — secondary */}
-        {[0, 0.5, 1].map((t) => {
-          const y = padT + innerH * (1 - t);
-          return (
-            <text
-              key={`yr-${t}`}
-              x={W - padR + 6}
-              y={y + 3}
-              textAnchor="start"
-              fontSize={10}
-              fill="var(--text-tertiary)"
+              <ChevronRight size={14} />
+              הקודם
+            </button>
+            <span className="cd-history-pagination__page">
+              עמוד {page} מתוך {totalPages}
+            </span>
+            <button
+              type="button"
+              className="cd-alert-btn"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages || isLoading}
+              aria-label="העמוד הבא"
             >
-              {abbr(secondaryMax * t)}
-            </text>
-          );
-        })}
-      </svg>
+              הבא
+              <ChevronLeft size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
-}
-
-function formatMonthLabel(ym: string): string {
-  const [y, m] = ym.split('-');
-  return `${m}/${y.slice(2)}`;
-}
-
-function abbr(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-  if (n >= 10) return n.toFixed(0);
-  return n.toFixed(1);
 }
 
 // ============================================================

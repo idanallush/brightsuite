@@ -3,7 +3,7 @@ import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
 import type { CampaignChangeRecord } from '@/lib/clients-dashboard/types';
 
-// GET /api/clients-dashboard/history?clientId=X&campaignId=Y&startDate=Z&endDate=W
+// GET /api/clients-dashboard/history?clientId=X&campaignId=Y&startDate=Z&endDate=W&page=N&pageSize=M
 // Returns the campaign change timeline (joined with ah_campaigns.name) plus a
 // daily time-series of spend / conversions / revenue for the chart.
 export async function GET(request: NextRequest) {
@@ -20,6 +20,14 @@ export async function GET(request: NextRequest) {
   const startDate = search.get('startDate') || defaultStart();
   const endDate = search.get('endDate') || todayYmd();
 
+  const pageRaw = Number(search.get('page'));
+  const pageSizeRaw = Number(search.get('pageSize'));
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+    ? Math.min(500, Math.floor(pageSizeRaw))
+    : 100;
+  const offset = (page - 1) * pageSize;
+
   const db = getTurso();
 
   // Campaign list — used by the dropdown in the UI.
@@ -31,12 +39,25 @@ export async function GET(request: NextRequest) {
   });
 
   // Change timeline.
-  const changeArgs: (string | number)[] = [clientId, startDate, endDate];
+  const filterArgs: (string | number)[] = [clientId, startDate, endDate];
   let campaignFilter = '';
   if (campaignId) {
     campaignFilter = ' AND ch.campaign_id = ?';
-    changeArgs.push(campaignId);
+    filterArgs.push(campaignId);
   }
+
+  // Total count for pagination footer.
+  const countResult = await db.execute({
+    sql: `
+      SELECT COUNT(*) AS total
+      FROM cd_campaign_changes ch
+      WHERE ch.client_id = ?
+        AND date(ch.detected_at) BETWEEN ? AND ?
+        ${campaignFilter}
+    `,
+    args: filterArgs,
+  });
+  const total = Number(countResult.rows[0]?.total ?? 0);
 
   const changesResult = await db.execute({
     sql: `
@@ -53,9 +74,9 @@ export async function GET(request: NextRequest) {
         AND date(ch.detected_at) BETWEEN ? AND ?
         ${campaignFilter}
       ORDER BY ch.detected_at DESC
-      LIMIT 500
+      LIMIT ? OFFSET ?
     `,
-    args: changeArgs,
+    args: [...filterArgs, pageSize, offset],
   });
 
   const changes = changesResult.rows.map((row) => ({
@@ -113,6 +134,9 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     changes,
+    total,
+    page,
+    pageSize,
     series,
     campaigns: campaignsResult.rows.map((r) => ({
       id: Number(r.id),
