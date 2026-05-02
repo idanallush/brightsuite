@@ -307,7 +307,7 @@
                  ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleDrop(event, 'feed45')">
                 <button class="absolute top-1 left-1 w-4 h-4 text-text-dim rounded text-[10px] leading-none hidden z-20 hover:text-red-500" onclick="event.stopPropagation(); clearMedia('feed45')" aria-label="Clear feed media">&times;</button>
                 <div id="feed45-icon"><svg class="text-text-dim" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="2" width="18" height="20" rx="2"/></svg></div>
-                <div><div class="text-[12px] font-medium text-text-primary">פיד 4:5</div><div class="text-[10px] text-text-dim">1080×1350</div></div>
+                <div><div class="text-[12px] font-medium text-text-primary">פיד 4:5</div><div class="text-[10px] text-text-dim">1440×1800</div></div>
                 <input type="file" id="feed45-input" accept="image/*,video/*" class="hidden" onchange="handleUpload(event, 'feed45')">
                 <div id="feed45-preview-container" class="hidden"><img class="w-6 h-8 object-cover rounded" /></div>
             </div>
@@ -448,8 +448,8 @@ const placements = [
     { id: 'fb-feed-car',      name: 'פייסבוק קרוסלה פיד',         platform: 'fb', mockup: 'feedCarousel',  ratio: 'carouselSq' },
 ];
 
-// Safe zones per Meta 2026 unified guidelines — base resolution: 1440x2560
-// Feed placements (4:5, 1:1) don't need safe zones — UI chrome is outside the image area
+// Safe zones per Meta 2026 unified guidelines
+// Story/Reels base: 1440x2560 — Feed 4:5 base: 1440x1800 (1:1 safe zone centered)
 const safeZoneSpecs = {
     story: {
         top: 14, bottom: 14, left: 0, right: 0,
@@ -460,6 +460,11 @@ const safeZoneSpecs = {
         top: 14, bottom: 35, left: 6, right: 6,
         px: { top: 358, bottom: 896, left: 86, right: 86 },
         labels: { top: 'UI OVERLAY', bottom: 'CTA / CAPTION', right: 'ACTIONS' }
+    },
+    feedPost: {
+        top: 10, bottom: 10, left: 0, right: 0,
+        px: { top: 180, bottom: 180, left: 0, right: 0 },
+        labels: { top: 'CROP ZONE', bottom: 'CROP ZONE' }
     },
 };
 
@@ -1086,7 +1091,7 @@ function buildReelsCarouselMockup(p) {
 }
 
 // ============================================================
-// FEED POST MOCKUP (4:5) — IG & FB variants — NO safe zone
+// FEED POST MOCKUP (4:5) — IG & FB variants — 1:1 safe zone (10%/180px top+bottom)
 // ============================================================
 function buildFeedPostMockup(p) {
     const isIG = p.platform === 'ig';
@@ -1096,6 +1101,7 @@ function buildFeedPostMockup(p) {
     // Create media element for 4:5
     const mediaSrc = state.feed45;
     const isVideo = state.feed45Type === 'video';
+    const szId = `feed-sz-${p.id}`;
 
     wrap.innerHTML = `
         <div style="position:relative;">
@@ -1108,7 +1114,7 @@ function buildFeedPostMockup(p) {
                 </div>
             </div>
             <!-- Image area: 4:5 aspect ratio -->
-            <div style="aspect-ratio:4/5;overflow:hidden;background:#f0f0f0;">
+            <div id="${szId}" style="position:relative;aspect-ratio:4/5;overflow:hidden;background:#f0f0f0;">
                 ${isVideo
                     ? `<video src="${mediaSrc}" muted autoplay loop playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
                     : `<img src="${mediaSrc}" style="width:100%;height:100%;object-fit:cover;display:block;">`
@@ -1134,6 +1140,9 @@ function buildFeedPostMockup(p) {
             `}
         </div>
     `;
+    const szContainer = wrap.querySelector(`#${szId}`);
+    const sz = createSafeZoneOverlay('feedPost');
+    if (szContainer && sz) szContainer.appendChild(sz);
     return wrap;
 }
 
