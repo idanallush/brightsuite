@@ -1098,30 +1098,34 @@ function buildFeedPostMockup(p) {
     const wrap = document.createElement('div');
     wrap.className = 'feed-mockup';
 
-    // Create media element for 4:5
     const mediaSrc = state.feed45;
     const isVideo = state.feed45Type === 'video';
-    const szId = `feed-sz-${p.id}`;
 
-    wrap.innerHTML = `
-        <div style="position:relative;">
-            <!-- Header -->
-            <div style="display:flex;align-items:center;padding:8px 10px;gap:6px;" dir="ltr">
-                <img src="220829521_102123092143924_6403435025276078538_n.jpg" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">
-                <div style="flex:1;">
-                    <div style="font-size:11px;font-weight:600;color:#1a1a1a;">${isIG ? 'Bright' : 'Bright Agency'}</div>
-                    <div style="font-size:9px;color:#999;">${isIG ? 'Ad' : 'Sponsored'}</div>
-                </div>
-            </div>
-            <!-- Image area: 4:5 aspect ratio -->
-            <div id="${szId}" style="position:relative;aspect-ratio:4/5;overflow:hidden;background:#f0f0f0;">
-                ${isVideo
-                    ? `<video src="${mediaSrc}" muted autoplay loop playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
-                    : `<img src="${mediaSrc}" style="width:100%;height:100%;object-fit:cover;display:block;">`
-                }
-            </div>
-            ${isIG ? `
-            <!-- IG: actions + caption -->
+    const header = document.createElement('div');
+    header.style.cssText = 'display:flex;align-items:center;padding:8px 10px;gap:6px;';
+    header.dir = 'ltr';
+    header.innerHTML = `
+        <img src="220829521_102123092143924_6403435025276078538_n.jpg" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+        <div style="flex:1;">
+            <div style="font-size:11px;font-weight:600;color:#1a1a1a;">${isIG ? 'Bright' : 'Bright Agency'}</div>
+            <div style="font-size:9px;color:#999;">${isIG ? 'Ad' : 'Sponsored'}</div>
+        </div>
+    `;
+
+    const imageArea = document.createElement('div');
+    imageArea.style.cssText = 'position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;background:#f0f0f0;';
+    imageArea.innerHTML = isVideo
+        ? `<video src="${mediaSrc}" muted autoplay loop playsinline style="width:100%;height:100%;object-fit:cover;display:block;"></video>`
+        : `<img src="${mediaSrc}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+    const sz = createSafeZoneOverlay('feedPost');
+    if (sz) imageArea.appendChild(sz);
+    const wrappedImage = wrapWithExternalLabels(imageArea, 'feedPost');
+    wrappedImage.style.alignItems = 'stretch';
+    wrappedImage.style.padding = '6px 0';
+
+    const footer = document.createElement('div');
+    footer.innerHTML = isIG
+        ? `
             <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;" dir="ltr">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#262626" stroke-width="1.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#262626" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1130,19 +1134,18 @@ function buildFeedPostMockup(p) {
             <div style="padding:0 10px 6px;" dir="rtl">
                 <span style="font-size:9px;color:#333;"><b>Bright</b> קריאייטיב שמביא תוצאות</span>
             </div>
-            ` : `
-            <!-- FB: like/comment/share -->
+        `
+        : `
             <div style="display:flex;gap:0;border-top:1px solid #eee;" dir="ltr">
                 <div style="flex:1;text-align:center;padding:6px 0;font-size:10px;color:#666;font-weight:500;">Like</div>
                 <div style="flex:1;text-align:center;padding:6px 0;font-size:10px;color:#666;font-weight:500;">Comment</div>
                 <div style="flex:1;text-align:center;padding:6px 0;font-size:10px;color:#666;font-weight:500;">Share</div>
             </div>
-            `}
-        </div>
-    `;
-    const szContainer = wrap.querySelector(`#${szId}`);
-    const sz = createSafeZoneOverlay('feedPost');
-    if (szContainer && sz) szContainer.appendChild(sz);
+        `;
+
+    wrap.appendChild(header);
+    wrap.appendChild(wrappedImage);
+    wrap.appendChild(footer);
     return wrap;
 }
 
