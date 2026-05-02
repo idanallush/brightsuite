@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Pencil, Plus, X } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ClientSummary } from '@/lib/clients-dashboard/types';
 
 interface HistoryTabProps {
@@ -65,6 +66,7 @@ const FIELD_LABEL: Record<string, string> = {
 export default function HistoryTab({ client }: HistoryTabProps) {
   const [campaignId, setCampaignId] = useState<string>('');
   const [showNoteFor, setShowNoteFor] = useState<number | null>(null);
+  const [addingForCampaign, setAddingForCampaign] = useState<number | null>(null);
 
   const url = useMemo(() => {
     const params = new URLSearchParams({ clientId: String(client.id) });
@@ -78,15 +80,30 @@ export default function HistoryTab({ client }: HistoryTabProps) {
   const monthly = useMemo(() => aggregateMonthly(series), [series]);
   const isEcom = client.metricType === 'ecommerce';
 
-  const handleAddNote = async (cmpId: number, note: string) => {
-    if (!note.trim()) return;
-    await fetch('/api/clients-dashboard/history/notes', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ campaignId: cmpId, note }),
-    });
-    setShowNoteFor(null);
-    mutate();
+  const submitNote = async (cmpId: number, note: string) => {
+    const trimmed = note.trim();
+    if (!trimmed) {
+      toast.error('יש להזין טקסט להערה');
+      return false;
+    }
+    try {
+      const res = await fetch('/api/clients-dashboard/history/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ campaignId: cmpId, note: trimmed }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        toast.error(body.error || `שגיאה בשמירת ההערה (${res.status})`);
+        return false;
+      }
+      toast.success('ההערה נשמרה');
+      await mutate();
+      return true;
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בשמירת ההערה');
+      return false;
+    }
   };
 
   return (
@@ -111,17 +128,23 @@ export default function HistoryTab({ client }: HistoryTabProps) {
           type="button"
           className="cd-alert-btn cd-alert-btn--primary"
           disabled={!campaignId}
-          onClick={() => setShowNoteFor(campaignId ? Number(campaignId) : null)}
+          onClick={() =>
+            setAddingForCampaign(campaignId ? Number(campaignId) : null)
+          }
         >
           <Plus size={14} /> הוסף הערה
         </button>
       </div>
 
-      {showNoteFor != null && (
+      {addingForCampaign != null && (
         <NoteForm
-          campaignId={showNoteFor}
-          onCancel={() => setShowNoteFor(null)}
-          onSubmit={(note) => handleAddNote(showNoteFor, note)}
+          campaignId={addingForCampaign}
+          onCancel={() => setAddingForCampaign(null)}
+          onSubmit={async (note) => {
+            const ok = await submitNote(addingForCampaign, note);
+            if (ok) setAddingForCampaign(null);
+            return ok;
+          }}
         />
       )}
 
@@ -148,7 +171,22 @@ export default function HistoryTab({ client }: HistoryTabProps) {
         ) : (
           <div className="cd-history-timeline__list">
             {(data?.changes ?? []).map((change) => (
-              <ChangeRow key={change.id} change={change} />
+              <ChangeRow
+                key={change.id}
+                change={change}
+                editing={showNoteFor === change.id}
+                onEdit={() => setShowNoteFor(change.id)}
+                onCancelEdit={() => setShowNoteFor(null)}
+                onSubmitEdit={async (note) => {
+                  if (change.campaignId == null) {
+                    toast.error('לא ניתן להוסיף הערה — חסר מזהה קמפיין');
+                    return false;
+                  }
+                  const ok = await submitNote(change.campaignId, note);
+                  if (ok) setShowNoteFor(null);
+                  return ok;
+                }}
+              />
             ))}
           </div>
         )}
@@ -355,22 +393,57 @@ function abbr(n: number): string {
 // Change row + note form
 // ============================================================
 
-function ChangeRow({ change }: { change: HistoryChange }) {
+function ChangeRow({
+  change,
+  editing,
+  onEdit,
+  onCancelEdit,
+  onSubmitEdit,
+}: {
+  change: HistoryChange;
+  editing: boolean;
+  onEdit: () => void;
+  onCancelEdit: () => void;
+  onSubmitEdit: (note: string) => Promise<boolean>;
+}) {
+  const canEdit = change.campaignId != null;
+  const isExistingNote = change.changeType === 'note' && !!change.note;
   return (
-    <div className="cd-history-row">
-      <div className="cd-history-row__date">{formatDate(change.detectedAt)}</div>
-      <div className="cd-history-row__campaign">
-        {change.campaignName ?? change.platformCampaignId ?? '—'}
-        <span className="cd-history-row__platform">{change.platform}</span>
+    <>
+      <div className="cd-history-row">
+        <div className="cd-history-row__date">{formatDate(change.detectedAt)}</div>
+        <div className="cd-history-row__campaign">
+          {change.campaignName ?? change.platformCampaignId ?? '—'}
+          <span className="cd-history-row__platform">{change.platform}</span>
+        </div>
+        <div className="cd-history-row__desc">{describeChange(change)}</div>
+        <div className="cd-history-row__source">
+          <span className={`cd-history-source cd-history-source--${change.source}`}>
+            {SOURCE_LABEL[change.source]}
+            {change.source === 'user' && change.userName ? ` · ${change.userName}` : ''}
+          </span>
+          {canEdit && !editing && (
+            <button
+              type="button"
+              className="cd-history-row__edit"
+              onClick={onEdit}
+              aria-label={isExistingNote ? 'ערוך הערה' : 'הוסף הערה'}
+              title={isExistingNote ? 'ערוך הערה' : 'הוסף הערה'}
+            >
+              <Pencil size={13} />
+            </button>
+          )}
+        </div>
       </div>
-      <div className="cd-history-row__desc">{describeChange(change)}</div>
-      <div className="cd-history-row__source">
-        <span className={`cd-history-source cd-history-source--${change.source}`}>
-          {SOURCE_LABEL[change.source]}
-          {change.source === 'user' && change.userName ? ` · ${change.userName}` : ''}
-        </span>
-      </div>
-    </div>
+      {editing && (
+        <NoteForm
+          campaignId={change.campaignId as number}
+          initialValue={isExistingNote ? change.note ?? '' : ''}
+          onCancel={onCancelEdit}
+          onSubmit={onSubmitEdit}
+        />
+      )}
+    </>
   );
 }
 
@@ -397,14 +470,16 @@ function formatDate(iso: string): string {
 
 function NoteForm({
   campaignId,
+  initialValue = '',
   onCancel,
   onSubmit,
 }: {
   campaignId: number;
+  initialValue?: string;
   onCancel: () => void;
-  onSubmit: (note: string) => void;
+  onSubmit: (note: string) => Promise<boolean> | void;
 }) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(initialValue);
   const [busy, setBusy] = useState(false);
 
   return (
