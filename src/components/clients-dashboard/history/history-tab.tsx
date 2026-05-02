@@ -3,7 +3,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR from 'swr';
-import { ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Pencil,
+  Plus,
+  Printer,
+  X,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import type { ClientSummary } from '@/lib/clients-dashboard/types';
 import {
@@ -11,6 +19,7 @@ import {
   SearchableSelect,
   type SearchableSelectItem,
 } from '@/components/clients-dashboard/ui/searchable-select';
+import { rowsToCsv, downloadCsv, type CsvColumn } from '@/lib/clients-dashboard/csv';
 
 interface HistoryTabProps {
   client: ClientSummary;
@@ -136,6 +145,7 @@ export default function HistoryTab({ client }: HistoryTabProps) {
 
   const [page, setPage] = useState<number>(() => parsePage(searchParams.get('page')));
   const [pageSize, setPageSize] = useState<number>(() => parsePageSize(searchParams.get('pageSize')));
+  const [exporting, setExporting] = useState(false);
 
   // Sync page/pageSize back to the URL (same pattern as cpa/page.tsx).
   useEffect(() => {
@@ -175,6 +185,72 @@ export default function HistoryTab({ client }: HistoryTabProps) {
   const handlePageSizeChange = useCallback((value: number) => {
     setPageSize(value);
     setPage(1);
+  }, []);
+
+  // Fetch every change row across all pages — needed for CSV / PDF exports so
+  // the output is the full filtered timeline, not just the current page.
+  // The API caps pageSize at 500, so we loop until we have `total` rows.
+  const fetchAllChanges = useCallback(async (): Promise<HistoryChange[]> => {
+    const PAGE = 500;
+    const collected: HistoryChange[] = [];
+    let p = 1;
+    while (true) {
+      const params = new URLSearchParams({
+        clientId: String(client.id),
+        page: String(p),
+        pageSize: String(PAGE),
+      });
+      if (campaignId) params.set('campaignId', campaignId);
+      const res = await fetch(`/api/clients-dashboard/history?${params.toString()}`);
+      if (!res.ok) throw new Error(`Request failed: ${res.status}`);
+      const body = (await res.json()) as HistoryResponse;
+      collected.push(...(body.changes ?? []));
+      const total = body.total ?? 0;
+      if (collected.length >= total || (body.changes ?? []).length === 0) break;
+      p += 1;
+      // Safety: never loop more than 50 pages (= 25k rows).
+      if (p > 50) break;
+    }
+    return collected;
+  }, [client.id, campaignId]);
+
+  const range = data?.range;
+
+  const handleExportCsv = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const all = await fetchAllChanges();
+      const columns: CsvColumn<HistoryChange>[] = [
+        { label: 'תאריך', raw: (r) => r.detectedAt },
+        { label: 'קמפיין', raw: (r) => r.campaignName ?? r.platformCampaignId ?? '' },
+        { label: 'פלטפורמה', raw: (r) => r.platform ?? '' },
+        { label: 'סוג שינוי', raw: (r) => r.changeType ?? '' },
+        { label: 'שדה', raw: (r) => r.field ?? '' },
+        { label: 'ערך קודם', raw: (r) => r.oldValue ?? '' },
+        { label: 'ערך חדש', raw: (r) => r.newValue ?? '' },
+        { label: 'מקור', raw: (r) => r.source ?? '' },
+        { label: 'משתמש', raw: (r) => r.userName ?? '' },
+        { label: 'הערה', raw: (r) => r.note ?? '' },
+      ];
+      const csv = rowsToCsv(columns, all);
+      const dateRange = range ? `${range.startDate}_${range.endDate}` : 'all';
+      downloadCsv(`history-${client.id}-${dateRange}.csv`, csv);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בייצוא');
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, fetchAllChanges, range, client.id]);
+
+  const handlePrintPdf = useCallback(() => {
+    // Use the browser's print pipeline. The @media print stylesheet (in
+    // styles.css) hides toolbar/pagination/note-form/client-changes section
+    // via .cd-history-no-print and shows the print header via
+    // .cd-history-print-only.
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   }, []);
 
   const submitNote = async (cmpId: number, note: string) => {
@@ -225,7 +301,7 @@ export default function HistoryTab({ client }: HistoryTabProps) {
 
   return (
     <div className="cd-history-tab">
-      <div className="cd-history-toolbar">
+      <div className="cd-history-toolbar cd-history-no-print">
         <label className="cd-history-toolbar__label">
           קמפיין:
           <SearchableSelect
@@ -247,24 +323,53 @@ export default function HistoryTab({ client }: HistoryTabProps) {
         >
           <Plus size={14} /> הוסף הערה
         </button>
+        <span style={{ marginInlineStart: 'auto' }} />
+        <button
+          type="button"
+          className="cd-alert-btn"
+          onClick={handleExportCsv}
+          disabled={exporting}
+        >
+          <Download size={14} /> ייצוא CSV
+        </button>
+        <button
+          type="button"
+          className="cd-alert-btn"
+          onClick={handlePrintPdf}
+          disabled={exporting}
+        >
+          <Printer size={14} /> הדפס PDF
+        </button>
+      </div>
+
+      <div className="cd-history-print-head cd-history-print-only">
+        <h2>{client.name} — היסטוריית שינויים</h2>
+        <div>
+          {range?.startDate} – {range?.endDate} · {total} רשומות · הופק{' '}
+          {new Date().toLocaleString('he-IL')}
+        </div>
       </div>
 
       {addingForCampaign != null && (
-        <NoteForm
-          campaignId={addingForCampaign}
-          onCancel={() => setAddingForCampaign(null)}
-          onSubmit={async (note) => {
-            const ok = await submitNote(addingForCampaign, note);
-            if (ok) setAddingForCampaign(null);
-            return ok;
-          }}
-        />
+        <div className="cd-history-no-print">
+          <NoteForm
+            campaignId={addingForCampaign}
+            onCancel={() => setAddingForCampaign(null)}
+            onSubmit={async (note) => {
+              const ok = await submitNote(addingForCampaign, note);
+              if (ok) setAddingForCampaign(null);
+              return ok;
+            }}
+          />
+        </div>
       )}
 
-      <ClientChangesSection
-        changes={data?.clientChanges ?? []}
-        isLoading={isLoading && !data}
-      />
+      <div className="cd-history-no-print">
+        <ClientChangesSection
+          changes={data?.clientChanges ?? []}
+          isLoading={isLoading && !data}
+        />
+      </div>
 
       <div className="cd-history-timeline">
         <div className="cd-history-timeline__head">
@@ -307,7 +412,7 @@ export default function HistoryTab({ client }: HistoryTabProps) {
           </div>
         )}
 
-        <div className="cd-history-pagination">
+        <div className="cd-history-pagination cd-history-no-print">
           <div className="cd-history-pagination__count">
             {total === 0
               ? 'אין רשומות'

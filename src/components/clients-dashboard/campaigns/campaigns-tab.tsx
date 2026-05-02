@@ -30,6 +30,7 @@ import type {
   CampaignsApiResponse,
   CampaignsTotals,
 } from '@/lib/clients-dashboard/campaigns';
+import { rowsToCsv, downloadCsv } from '@/lib/clients-dashboard/csv';
 import DailyChart from './daily-chart';
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
@@ -279,36 +280,6 @@ function buildColumns(metricType: 'leads' | 'ecommerce'): Column[] {
   }
 
   return cols;
-}
-
-// =====================================================
-// CSV export
-// =====================================================
-
-function rowsToCsv(columns: Column[], rows: CampaignRow[]): string {
-  const head = columns.map((c) => csvCell(c.label)).join(',');
-  const lines = rows.map((r) => columns.map((c) => csvCell(c.raw(r))).join(','));
-  return [head, ...lines].join('\n');
-}
-
-function csvCell(v: string): string {
-  if (/[",\n]/.test(v)) {
-    return '"' + v.replace(/"/g, '""') + '"';
-  }
-  return v;
-}
-
-function downloadCsv(filename: string, csv: string): void {
-  // Prepend BOM so Excel renders Hebrew correctly.
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 // =====================================================

@@ -4,7 +4,13 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import useSWR from "swr";
 import { format, subDays, parse } from "date-fns";
-import { ChevronRight, ChevronLeft, CalendarDays } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronLeft,
+  CalendarDays,
+  Download,
+  Printer,
+} from "lucide-react";
 import {
   Table,
   TableBody,
@@ -81,6 +87,37 @@ function toDisplay(dateStr: string): string {
   }
 }
 
+// =====================================================
+// CSV helpers — small, copy-pasted from clients-dashboard.
+// Kept local to CPA so this module stays self-contained.
+// =====================================================
+
+function csvCell(v: string): string {
+  if (/[",\n]/.test(v)) {
+    return '"' + v.replace(/"/g, '""') + '"';
+  }
+  return v;
+}
+
+function rowsToCsv(headers: string[], rows: string[][]): string {
+  const head = headers.map(csvCell).join(",");
+  const lines = rows.map((r) => r.map(csvCell).join(","));
+  return [head, ...lines].join("\n");
+}
+
+function downloadCsv(filename: string, csv: string): void {
+  // Prepend BOM so Excel renders Hebrew correctly.
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 const fetcher = async (url: string): Promise<AlertLogResponse> => {
   const res = await fetch(url);
   const body = await res.json();
@@ -136,6 +173,7 @@ function AlertsLogContent() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [draftSince, setDraftSince] = useState(since);
   const [draftUntil, setDraftUntil] = useState(until);
+  const [exporting, setExporting] = useState(false);
 
   const updateUrl = useCallback(
     (next: Partial<{ since: string; until: string; clientId: string; page: number; pageSize: number }>) => {
@@ -173,6 +211,76 @@ function AlertsLogContent() {
     slack: "Slack",
     telegram: "Telegram",
   };
+
+  // Fetch every alert log row across all pages for the current filter set.
+  // The API caps pageSize at 200, so loop until we have `total` rows.
+  const fetchAllLogs = useCallback(async (): Promise<AlertLogEntry[]> => {
+    const PAGE = 200;
+    const collected: AlertLogEntry[] = [];
+    let p = 1;
+    while (true) {
+      const params = new URLSearchParams();
+      params.set("since", since);
+      params.set("until", until);
+      if (clientFilter !== "all") params.set("client_id", clientFilter);
+      params.set("page", String(p));
+      params.set("pageSize", String(PAGE));
+      const res = await fetcher(`/api/cpa/alerts/log?${params.toString()}`);
+      collected.push(...(res.logs ?? []));
+      const total = res.total ?? 0;
+      if (collected.length >= total || (res.logs ?? []).length === 0) break;
+      p += 1;
+      // Safety: never loop more than 100 pages (= 20k rows).
+      if (p > 100) break;
+    }
+    return collected;
+  }, [since, until, clientFilter]);
+
+  const handleExportCsv = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const all = await fetchAllLogs();
+      const headers = [
+        "תאריך",
+        "לקוח",
+        "נושא",
+        "CPA בפועל",
+        "יעד",
+        "חריגה%",
+        "ערוצים",
+      ];
+      const rows = all.map((log) => [
+        log.sent_at,
+        log.client_name ?? "",
+        log.topic_name ?? "",
+        String(log.actual_cpa ?? ""),
+        String(log.target_cpa ?? ""),
+        String(log.overshoot_percent ?? ""),
+        (log.channels_notified?.length
+          ? log.channels_notified
+          : log.channel
+            ? [log.channel]
+            : []
+        ).join("|"),
+      ]);
+      const csv = rowsToCsv(headers, rows);
+      downloadCsv(`cpa-alerts-${since}_${until}.csv`, csv);
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, fetchAllLogs, since, until]);
+
+  const handlePrintPdf = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.print();
+    }
+  }, []);
+
+  const selectedClientName =
+    clientFilter === "all"
+      ? "כל הלקוחות"
+      : clients?.find((c) => c.id === clientFilter)?.name ?? clientFilter;
 
   if (loading) {
     return (
@@ -216,8 +324,29 @@ function AlertsLogContent() {
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6 p-6 cpa-alerts-page">
+      <style>{`
+        .cpa-alerts-print-only { display: none; }
+        @media print {
+          .cpa-alerts-no-print { display: none !important; }
+          .cpa-alerts-print-only { display: block !important; margin-bottom: 12px; }
+          .cpa-alerts-print-only h2 { margin: 0 0 4px; font-size: 18px; }
+          .cpa-alerts-print-only .meta { font-size: 12px; color: #555; }
+          .cpa-alerts-page { padding: 0 !important; }
+          .cpa-alerts-page table { font-size: 11px; }
+          .cpa-alerts-page tr { page-break-inside: avoid; }
+        }
+      `}</style>
+
+      <div className="cpa-alerts-print-only">
+        <h2>היסטוריית התראות — {selectedClientName}</h2>
+        <div className="meta">
+          {toDisplay(since)} – {toDisplay(until)} · {data?.total ?? 0} רשומות · הופק{" "}
+          {new Date().toLocaleString("he-IL")}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 cpa-alerts-no-print">
         <h1 className="text-2xl font-bold">היסטוריית התראות</h1>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -298,6 +427,25 @@ function AlertsLogContent() {
               ))}
             </SelectContent>
           </Select>
+
+          <Button
+            variant="outline"
+            className="gap-2 text-sm h-9"
+            onClick={handleExportCsv}
+            disabled={exporting}
+          >
+            <Download className="h-4 w-4" />
+            ייצוא CSV
+          </Button>
+          <Button
+            variant="outline"
+            className="gap-2 text-sm h-9"
+            onClick={handlePrintPdf}
+            disabled={exporting}
+          >
+            <Printer className="h-4 w-4" />
+            הדפס PDF
+          </Button>
         </div>
       </div>
 
@@ -354,7 +502,7 @@ function AlertsLogContent() {
           )}
 
           {!logsLoading && total > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 mt-4 border-t">
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 mt-4 border-t cpa-alerts-no-print">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <span>
                   מציג {rangeStart}–{rangeEnd} מתוך {total}
