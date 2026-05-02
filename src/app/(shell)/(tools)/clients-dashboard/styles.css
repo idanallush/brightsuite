@@ -175,7 +175,8 @@
 
 .cd-mono {
   font-feature-settings: 'tnum' 1, 'lnum' 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
+  unicode-bidi: plaintext;
 }
 
 .cd-num {

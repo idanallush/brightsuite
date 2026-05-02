@@ -282,7 +282,7 @@ export const PlatformConnections = () => {
           ) : (
             <>
               <p className="text-xs text-muted-foreground">
-                חיבור יחיד ל-Google Ads ול-Google Analytics 4. התחברות אחת → שתי הפלטפורמות עובדות.
+                חיבור יחיד ל-Google Ads ול-Google Analytics 4. התחברות אחת ← שתי הפלטפורמות עובדות.
               </p>
               <Button
                 asChild

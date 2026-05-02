@@ -487,7 +487,7 @@ function describeChange(change: HistoryChange): string {
     return `נרשם ${fieldLabel}: ${change.newValue ?? ''}`;
   }
   const fieldLabel = change.field ? FIELD_LABEL[change.field] ?? change.field : '';
-  return `${fieldLabel}: ${change.oldValue ?? '—'} → ${change.newValue ?? '—'}`;
+  return `${fieldLabel}: ${change.oldValue ?? '—'} ← ${change.newValue ?? '—'}`;
 }
 
 function formatDate(iso: string): string {

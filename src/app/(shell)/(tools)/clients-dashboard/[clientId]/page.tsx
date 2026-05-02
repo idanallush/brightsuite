@@ -169,7 +169,7 @@ export default function ClientDetailPage({
         <strong style={{ color: '#b91c1c' }}>לא נמצא לקוח עם המזהה {id}</strong>
         <div style={{ marginTop: 8 }}>
           <Link href="/clients-dashboard" className="cd-back-link">
-            ← חזרה לרשימה
+            → חזרה לרשימה
           </Link>
         </div>
       </div>

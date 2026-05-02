@@ -520,7 +520,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
             onChange={(e) => setRange((r) => ({ ...r, startDate: e.target.value }))}
             max={range.endDate}
           />
-          <span className="cd-camp-toolbar__sep">→</span>
+          <span className="cd-camp-toolbar__sep">–</span>
           <input
             type="date"
             className="cd-input"
@@ -569,7 +569,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
           <div className="cd-camp-print-head cd-camp-print-only">
             <h2>{client.name} — קמפיינים</h2>
             <div>
-              {range.startDate} → {range.endDate} · {totalRows} קמפיינים
+              {range.startDate} – {range.endDate} · {totalRows} קמפיינים
             </div>
           </div>
 
