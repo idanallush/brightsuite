@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { AlertCircle, AlertTriangle, Check, Info, RotateCcw } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Check, Info, Loader2, RotateCcw } from 'lucide-react';
+import { toast } from 'sonner';
 import type {
   AlertRecord,
   AlertSeverity,
@@ -41,6 +42,7 @@ type StatusFilter = AlertStatus | 'all';
 export default function AlertsTab({ client }: AlertsTabProps) {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('all');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('open');
+  const [pendingIds, setPendingIds] = useState<Set<number>>(new Set());
 
   const url = useMemo(() => {
     const params = new URLSearchParams({ clientId: String(client.id) });
@@ -53,12 +55,32 @@ export default function AlertsTab({ client }: AlertsTabProps) {
   const alerts = data?.alerts ?? [];
 
   const handlePatch = async (alertId: number, status: AlertStatus) => {
-    await fetch(`/api/clients-dashboard/alerts/${alertId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
+    setPendingIds((prev) => {
+      const next = new Set(prev);
+      next.add(alertId);
+      return next;
     });
-    mutate();
+    try {
+      const res = await fetch(`/api/clients-dashboard/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        throw new Error(body.error || `שגיאה בעדכון סטטוס ההתראה (${res.status})`);
+      }
+      toast.success('סטטוס ההתראה עודכן');
+      await mutate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בעדכון סטטוס ההתראה');
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(alertId);
+        return next;
+      });
+    }
   };
 
   return (
@@ -117,6 +139,7 @@ export default function AlertsTab({ client }: AlertsTabProps) {
               key={alert.id}
               alert={alert}
               currency={client.currency}
+              pending={pendingIds.has(alert.id)}
               onPatch={handlePatch}
             />
           ))}
@@ -129,11 +152,11 @@ export default function AlertsTab({ client }: AlertsTabProps) {
 interface AlertCardProps {
   alert: AlertRecord;
   currency: string;
+  pending: boolean;
   onPatch: (id: number, status: AlertStatus) => Promise<void>;
 }
 
-function AlertCard({ alert, currency, onPatch }: AlertCardProps) {
-  const [busy, setBusy] = useState(false);
+function AlertCard({ alert, currency, pending, onPatch }: AlertCardProps) {
   const Icon =
     alert.severity === 'critical'
       ? AlertCircle
@@ -141,13 +164,8 @@ function AlertCard({ alert, currency, onPatch }: AlertCardProps) {
       ? AlertTriangle
       : Info;
 
-  const handle = async (status: AlertStatus) => {
-    setBusy(true);
-    try {
-      await onPatch(alert.id, status);
-    } finally {
-      setBusy(false);
-    }
+  const handle = (status: AlertStatus) => {
+    void onPatch(alert.id, status);
   };
 
   return (
@@ -184,17 +202,25 @@ function AlertCard({ alert, currency, onPatch }: AlertCardProps) {
             <button
               className="cd-alert-btn"
               type="button"
-              disabled={busy}
+              disabled={pending}
               onClick={() => handle('acknowledged')}
             >
-              <Check size={14} /> אישור
+              {pending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Check size={14} />
+              )}{' '}
+              אישור
             </button>
             <button
               className="cd-alert-btn cd-alert-btn--primary"
               type="button"
-              disabled={busy}
+              disabled={pending}
               onClick={() => handle('resolved')}
             >
+              {pending ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : null}{' '}
               פתור
             </button>
           </>
@@ -203,9 +229,12 @@ function AlertCard({ alert, currency, onPatch }: AlertCardProps) {
           <button
             className="cd-alert-btn cd-alert-btn--primary"
             type="button"
-            disabled={busy}
+            disabled={pending}
             onClick={() => handle('resolved')}
           >
+            {pending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : null}{' '}
             פתור
           </button>
         )}
@@ -213,10 +242,15 @@ function AlertCard({ alert, currency, onPatch }: AlertCardProps) {
           <button
             className="cd-alert-btn"
             type="button"
-            disabled={busy}
+            disabled={pending}
             onClick={() => handle('open')}
           >
-            <RotateCcw size={14} /> פתוח שוב
+            {pending ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <RotateCcw size={14} />
+            )}{' '}
+            פתוח שוב
           </button>
         )}
       </div>
