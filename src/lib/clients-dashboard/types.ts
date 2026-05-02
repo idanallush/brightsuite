@@ -45,12 +45,17 @@ export interface DateRange {
 // Saved view payload (frontend-owned shape, persisted as JSON in cd_user_views).
 // Each surface (clients-list, campaigns, creative, history, alerts) defines
 // its own payload variant under `scope`.
+//
+// `payloadVersion` is the schema version the payload was written with. Read
+// paths run it through `migrateCdViewPayload` so older rows keep working after
+// shape changes. See `src/lib/clients-dashboard/views-schema.ts`.
 export interface UserViewRecord<TPayload = unknown> {
   id: number;
   userId: number;
   scope: string;
   name: string;
   payload: TPayload;
+  payloadVersion: number;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;

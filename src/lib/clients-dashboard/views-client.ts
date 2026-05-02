@@ -10,11 +10,32 @@
 
 import useSWR, { mutate } from 'swr';
 import type { UserViewRecord } from './types';
+import { getCdCurrentVersion, migrateCdViewPayload } from './views-schema';
 
 const VIEWS_LIST_KEY = '/api/clients-dashboard/views';
 
 type ListResponse<T = unknown> = { views: UserViewRecord<T>[] };
 type SingleResponse<T = unknown> = { view: UserViewRecord<T> };
+
+/**
+ * Run a saved-view through the schema migrator for its scope, returning the
+ * forward-migrated copy. Views whose payload_version is newer than this
+ * client knows about are returned as `null` — callers should drop them from
+ * the dropdown rather than crash on an unknown shape.
+ */
+function migrateOrSkip<T>(view: UserViewRecord<T>): UserViewRecord<T> | null {
+  const current = getCdCurrentVersion(view.scope);
+  const version = Number.isFinite(view.payloadVersion) ? view.payloadVersion : 1;
+  if (version > current) {
+    // Newer payload than this client knows about — graceful degradation.
+    console.warn(
+      `[clients-dashboard] skipping saved view "${view.name}" (id=${view.id}, scope=${view.scope}): payload_version=${version} > current=${current}`,
+    );
+    return null;
+  }
+  const migrated = migrateCdViewPayload(view.scope, version, view.payload) as T;
+  return { ...view, payload: migrated, payloadVersion: current };
+}
 
 async function jsonFetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -45,8 +66,15 @@ export function useViews<T = unknown>(scope: string): {
     url,
     jsonFetcher,
   );
+  // Forward-migrate every view's payload, drop ones from a future schema.
+  const rawViews = data?.views ?? [];
+  const views: UserViewRecord<T>[] = [];
+  for (const raw of rawViews) {
+    const migrated = migrateOrSkip<T>(raw);
+    if (migrated) views.push(migrated);
+  }
   return {
-    views: data?.views ?? [],
+    views,
     isLoading,
     error,
     refresh: () => localMutate(),

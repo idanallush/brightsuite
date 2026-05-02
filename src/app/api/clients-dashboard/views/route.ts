@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
 import type { UserViewRecord } from '@/lib/clients-dashboard/types';
+import { getCdCurrentVersion } from '@/lib/clients-dashboard/views-schema';
 
 // Map a raw cd_user_views row into a typed UserViewRecord, parsing the JSON payload.
 function mapView(row: Record<string, unknown>): UserViewRecord {
@@ -18,6 +19,7 @@ function mapView(row: Record<string, unknown>): UserViewRecord {
     scope: String(row.scope),
     name: String(row.name),
     payload,
+    payloadVersion: Number(row.payload_version ?? 1),
     isDefault: Number(row.is_default ?? 0) === 1,
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
@@ -88,6 +90,8 @@ export async function POST(request: NextRequest) {
   const db = getTurso();
   const userId = auth.session.userId;
 
+  const payloadVersion = getCdCurrentVersion(scope);
+
   try {
     if (isDefault) {
       // Clear other defaults in this scope first, then insert as default — one batch.
@@ -98,16 +102,16 @@ export async function POST(request: NextRequest) {
           args: [userId, scope],
         },
         {
-          sql: `INSERT INTO cd_user_views (user_id, scope, name, payload, is_default)
-                VALUES (?, ?, ?, ?, 1)`,
-          args: [userId, scope, name, payloadJson],
+          sql: `INSERT INTO cd_user_views (user_id, scope, name, payload, payload_version, is_default)
+                VALUES (?, ?, ?, ?, ?, 1)`,
+          args: [userId, scope, name, payloadJson, payloadVersion],
         },
       ]);
     } else {
       await db.execute({
-        sql: `INSERT INTO cd_user_views (user_id, scope, name, payload, is_default)
-              VALUES (?, ?, ?, ?, 0)`,
-        args: [userId, scope, name, payloadJson],
+        sql: `INSERT INTO cd_user_views (user_id, scope, name, payload, payload_version, is_default)
+              VALUES (?, ?, ?, ?, ?, 0)`,
+        args: [userId, scope, name, payloadJson, payloadVersion],
       });
     }
 

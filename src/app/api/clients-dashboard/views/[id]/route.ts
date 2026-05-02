@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
 import type { UserViewRecord } from '@/lib/clients-dashboard/types';
+import { getCdCurrentVersion } from '@/lib/clients-dashboard/views-schema';
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -18,6 +19,7 @@ function mapView(row: Record<string, unknown>): UserViewRecord {
     scope: String(row.scope),
     name: String(row.name),
     payload,
+    payloadVersion: Number(row.payload_version ?? 1),
     isDefault: Number(row.is_default ?? 0) === 1,
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
@@ -81,6 +83,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
     }
     sets.push('payload = ?');
     args.push(payloadJson);
+    // The new payload was produced by the current client, so it's at the
+    // current schema version for this scope. Stamping the row keeps reads
+    // honest after a shape change lands and old rows get migrated forward
+    // by the read path.
+    sets.push('payload_version = ?');
+    args.push(getCdCurrentVersion(current.scope));
   }
 
   // isDefault is handled specially below to ensure mutual exclusion in the scope.

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
+import { CPA_VIEWS_CURRENT_VERSION } from '@/lib/cpa/views-schema';
 import type { CpaUserViewRecord } from '../route';
 
 type Params = { params: Promise<{ id: string }> };
@@ -17,6 +18,7 @@ function mapView(row: Record<string, unknown>): CpaUserViewRecord {
     userId: Number(row.user_id),
     name: String(row.name),
     payload,
+    payloadVersion: Number(row.payload_version ?? 1),
     isDefault: Number(row.is_default ?? 0) === 1,
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
@@ -79,6 +81,11 @@ export async function PUT(request: NextRequest, { params }: Params) {
     }
     sets.push('payload = ?');
     args.push(payloadJson);
+    // The new payload was produced by the current client, so it's at the
+    // current schema version. Stamping the row keeps reads honest after a
+    // shape change lands and old rows are migrated forward by the read path.
+    sets.push('payload_version = ?');
+    args.push(CPA_VIEWS_CURRENT_VERSION);
   }
 
   // isDefault is handled specially below to ensure mutual exclusion per user.

@@ -298,6 +298,7 @@ export async function initDatabase(): Promise<void> {
       scope TEXT NOT NULL,
       name TEXT NOT NULL,
       payload TEXT NOT NULL,
+      payload_version INTEGER NOT NULL DEFAULT 1,
       is_default INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -323,6 +324,7 @@ export async function initDatabase(): Promise<void> {
       user_id INTEGER NOT NULL REFERENCES bs_users(id) ON DELETE CASCADE,
       name TEXT NOT NULL,
       payload TEXT NOT NULL,
+      payload_version INTEGER NOT NULL DEFAULT 1,
       is_default INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now')),
@@ -425,6 +427,40 @@ export async function initDatabase(): Promise<void> {
       args: [],
     });
     console.log('[DB] Added reopened_count column to cd_alerts');
+  }
+
+  // Migration: add payload_version to cd_user_views and cpa_user_views.
+  // Existing rows are backfilled to version=1 via the column default.
+  // SQLite doesn't allow `NOT NULL` on an ADD COLUMN without a constant default,
+  // so we use `DEFAULT 1` which both backfills existing rows and constrains new
+  // inserts that omit the column. The CREATE TABLE blocks above declare the
+  // column as `NOT NULL DEFAULT 1` for fresh databases; on already-deployed
+  // databases the column lands as `DEFAULT 1` (effectively the same since
+  // every write path supplies the column explicitly).
+  const cdViewsCols = await db.execute({
+    sql: `PRAGMA table_info(cd_user_views)`,
+    args: [],
+  });
+  const cdViewsColNames = new Set(cdViewsCols.rows.map((r) => r.name as string));
+  if (!cdViewsColNames.has('payload_version')) {
+    await db.execute({
+      sql: `ALTER TABLE cd_user_views ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 1`,
+      args: [],
+    });
+    console.log('[DB] Added payload_version column to cd_user_views');
+  }
+
+  const cpaViewsCols = await db.execute({
+    sql: `PRAGMA table_info(cpa_user_views)`,
+    args: [],
+  });
+  const cpaViewsColNames = new Set(cpaViewsCols.rows.map((r) => r.name as string));
+  if (!cpaViewsColNames.has('payload_version')) {
+    await db.execute({
+      sql: `ALTER TABLE cpa_user_views ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 1`,
+      args: [],
+    });
+    console.log('[DB] Added payload_version column to cpa_user_views');
   }
 
   // Bootstrap: if no admin exists yet, promote the earliest active user to admin.

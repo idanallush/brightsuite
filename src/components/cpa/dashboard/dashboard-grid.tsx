@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import useSWR from "swr";
 import { Eye, EyeOff, Filter, ChevronsDownUp, ChevronsUpDown, Bookmark, Trash2, Save, LayoutGrid, TableProperties } from "lucide-react";
 import type { ClientCardData, CpaStatus } from "@/lib/cpa/types/dashboard";
+import { CPA_VIEWS_CURRENT_VERSION, migrateCpaViewPayload } from "@/lib/cpa/views-schema";
 import { ClientCard } from "@/components/cpa/dashboard/client-card";
 import { TableView } from "@/components/cpa/dashboard/table-view";
 import { Button } from "@/components/cpa/ui/button";
@@ -51,13 +52,24 @@ interface RawServerView {
   id: number;
   name: string;
   payload: unknown;
+  payloadVersion?: number;
   isDefault: boolean;
 }
 
-function normalizeServerView(raw: RawServerView): SavedView {
-  const p = raw.payload as { clientIds?: unknown } | null;
+function normalizeServerView(raw: RawServerView): SavedView | null {
+  // Forward-migrate, or drop if the row was written by a newer client than us.
+  const version = Number.isFinite(raw.payloadVersion) ? Number(raw.payloadVersion) : 1;
+  if (version > CPA_VIEWS_CURRENT_VERSION) {
+    console.warn(
+      `[cpa] skipping saved view "${raw.name}" (id=${raw.id}): payload_version=${version} > current=${CPA_VIEWS_CURRENT_VERSION}`,
+    );
+    return null;
+  }
+  const migrated = migrateCpaViewPayload(version, raw.payload) as { clientIds?: unknown } | null;
   const clientIds =
-    p && Array.isArray(p.clientIds) ? p.clientIds.filter((x): x is string => typeof x === "string") : [];
+    migrated && Array.isArray(migrated.clientIds)
+      ? migrated.clientIds.filter((x): x is string => typeof x === "string")
+      : [];
   return {
     id: raw.id,
     name: raw.name,
@@ -74,7 +86,13 @@ async function viewsFetcher(url: string): Promise<SavedView[]> {
     return [];
   }
   const data = (await res.json().catch(() => ({}))) as { views?: RawServerView[] };
-  return Array.isArray(data.views) ? data.views.map(normalizeServerView) : [];
+  if (!Array.isArray(data.views)) return [];
+  const normalized: SavedView[] = [];
+  for (const raw of data.views) {
+    const view = normalizeServerView(raw);
+    if (view) normalized.push(view);
+  }
+  return normalized;
 }
 
 function getHiddenCards(): Set<string> {
@@ -349,7 +367,12 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
           });
           if (!res.ok) throw new Error(await res.text());
           const body = (await res.json()) as { view: RawServerView };
-          return [...current.filter((v) => v.id !== optimistic.id), normalizeServerView(body.view)];
+          const created = normalizeServerView(body.view);
+          const without = current.filter((v) => v.id !== optimistic.id);
+          // `created` is null only if the freshly-saved view came back at a
+          // future schema version — impossible since this client wrote it,
+          // but guard anyway so the cache stays consistent.
+          return created ? [...without, created] : without;
         },
         {
           optimisticData: (current = []) => [...current, optimistic],

@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
+import { CPA_VIEWS_CURRENT_VERSION } from '@/lib/cpa/views-schema';
 
 export interface CpaUserViewRecord {
   id: number;
   userId: number;
   name: string;
   payload: unknown;
+  payloadVersion: number;
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
@@ -26,6 +28,7 @@ function mapView(row: Record<string, unknown>): CpaUserViewRecord {
     userId: Number(row.user_id),
     name: String(row.name),
     payload,
+    payloadVersion: Number(row.payload_version ?? 1),
     isDefault: Number(row.is_default ?? 0) === 1,
     createdAt: String(row.created_at ?? ''),
     updatedAt: String(row.updated_at ?? ''),
@@ -95,9 +98,15 @@ export async function POST(request: NextRequest) {
 
       try {
         await db.execute({
-          sql: `INSERT INTO cpa_user_views (user_id, name, payload, is_default)
-                VALUES (?, ?, ?, ?)`,
-          args: [userId, name, payloadJson, item.isDefault === true ? 1 : 0],
+          sql: `INSERT INTO cpa_user_views (user_id, name, payload, payload_version, is_default)
+                VALUES (?, ?, ?, ?, ?)`,
+          args: [
+            userId,
+            name,
+            payloadJson,
+            CPA_VIEWS_CURRENT_VERSION,
+            item.isDefault === true ? 1 : 0,
+          ],
         });
         const row = await db.execute({
           sql: `SELECT * FROM cpa_user_views WHERE user_id = ? AND name = ? LIMIT 1`,
@@ -149,16 +158,16 @@ export async function POST(request: NextRequest) {
           args: [userId],
         },
         {
-          sql: `INSERT INTO cpa_user_views (user_id, name, payload, is_default)
-                VALUES (?, ?, ?, 1)`,
-          args: [userId, name, payloadJson],
+          sql: `INSERT INTO cpa_user_views (user_id, name, payload, payload_version, is_default)
+                VALUES (?, ?, ?, ?, 1)`,
+          args: [userId, name, payloadJson, CPA_VIEWS_CURRENT_VERSION],
         },
       ]);
     } else {
       await db.execute({
-        sql: `INSERT INTO cpa_user_views (user_id, name, payload, is_default)
-              VALUES (?, ?, ?, 0)`,
-        args: [userId, name, payloadJson],
+        sql: `INSERT INTO cpa_user_views (user_id, name, payload, payload_version, is_default)
+              VALUES (?, ?, ?, ?, 0)`,
+        args: [userId, name, payloadJson, CPA_VIEWS_CURRENT_VERSION],
       });
     }
 
