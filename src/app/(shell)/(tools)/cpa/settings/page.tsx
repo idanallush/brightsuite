@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import useSWR from "swr";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/cpa/ui/tabs";
 import { Card } from "@/components/cpa/ui/card";
@@ -25,25 +25,45 @@ const fetcher = async (url: string) => {
 export default function CpaSettingsPage() {
   const { loading, hasToolAccess } = useAuth();
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wasOpenedAutomatically, setWasOpenedAutomatically] = useState(false);
+  const [userDismissed, setUserDismissed] = useState(false);
   const [activeTab, setActiveTab] = useState("fb-connection");
-  const autoOpenChecked = useRef(false);
 
-  // Fetch health to determine auto-open
   const { data: healthData } = useSWR(
     !loading ? "/api/cpa/health" : null,
     fetcher,
     { revalidateOnFocus: false }
   );
 
-  // Auto-open wizard if no active clients
   useEffect(() => {
-    if (healthData && !autoOpenChecked.current) {
-      autoOpenChecked.current = true;
-      if (healthData.active_clients_count === 0) {
-        setWizardOpen(true);
-      }
+    if (!healthData) return;
+    const isUnconfigured = healthData.active_clients_count === 0;
+
+    if (isUnconfigured && !userDismissed && !wizardOpen) {
+      setWizardOpen(true);
+      setWasOpenedAutomatically(true);
+      return;
     }
-  }, [healthData]);
+
+    if (!isUnconfigured && wizardOpen && wasOpenedAutomatically) {
+      setWizardOpen(false);
+      setWasOpenedAutomatically(false);
+    }
+  }, [healthData, userDismissed, wizardOpen, wasOpenedAutomatically]);
+
+  function handleWizardOpenChange(open: boolean) {
+    setWizardOpen(open);
+    if (!open) {
+      setUserDismissed(true);
+      setWasOpenedAutomatically(false);
+    }
+  }
+
+  function handleManualOpen() {
+    setWizardOpen(true);
+    setWasOpenedAutomatically(false);
+    setUserDismissed(false);
+  }
 
   function handleNavigateTab(tab: string) {
     setActiveTab(tab);
@@ -74,7 +94,7 @@ export default function CpaSettingsPage() {
         <div />
         <Button
           variant="outline"
-          onClick={() => setWizardOpen(true)}
+          onClick={handleManualOpen}
           className="gap-1.5 text-sm"
         >
           <Wand2 className="h-4 w-4" />
@@ -120,7 +140,7 @@ export default function CpaSettingsPage() {
         </TabsContent>
       </Tabs>
 
-      <SetupWizard open={wizardOpen} onOpenChange={setWizardOpen} />
+      <SetupWizard open={wizardOpen} onOpenChange={handleWizardOpenChange} />
     </div>
   );
 }

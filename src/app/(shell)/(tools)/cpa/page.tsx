@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import useSWR from "swr";
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { RefreshCw, Settings, BarChart3, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -42,22 +42,37 @@ function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => voi
 function DashboardContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
   const { user, loading, hasToolAccess } = useAuth();
   const { dateRange, setDateRange, lastUpdated, setLastUpdated } = useDashboardStore();
 
-  const [urlSynced, setUrlSynced] = useState(false);
-  if (!urlSynced) {
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
     const urlSince = searchParams.get("since");
     const urlUntil = searchParams.get("until");
-    if (
-      urlSince && urlUntil &&
-      /^\d{4}-\d{2}-\d{2}$/.test(urlSince) &&
-      /^\d{4}-\d{2}-\d{2}$/.test(urlUntil)
-    ) {
-      setDateRange({ since: urlSince, until: urlUntil });
+    const dateRe = /^\d{4}-\d{2}-\d{2}$/;
+
+    if (urlSince && urlUntil && dateRe.test(urlSince) && dateRe.test(urlUntil)) {
+      const store = useDashboardStore.getState();
+      if (urlSince !== store.dateRange.since || urlUntil !== store.dateRange.until) {
+        store.setDateRange({ since: urlSince, until: urlUntil });
+      }
+    } else {
+      const { since, until } = useDashboardStore.getState().dateRange;
+      if (since && until) {
+        const params = new URLSearchParams();
+        params.set("since", since);
+        params.set("until", until);
+        router.replace(`${pathname}?${params.toString()}`);
+      }
     }
-    setUrlSynced(true);
-  }
+
+    setHydrated(true);
+    // Run once on mount: URL is the authoritative initial value if present,
+    // otherwise the persisted store wins and is reflected back to the URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDateRangeChange = useCallback(
     (range: { since: string; until: string }) => {
@@ -65,13 +80,15 @@ function DashboardContent() {
       const params = new URLSearchParams();
       params.set("since", range.since);
       params.set("until", range.until);
-      router.replace(`?${params.toString()}`);
+      router.push(`${pathname}?${params.toString()}`);
     },
-    [setDateRange, router]
+    [setDateRange, router, pathname]
   );
 
   const { data, error, isLoading, mutate } = useSWR<ClientCardData[]>(
-    `/api/cpa/dashboard/cards?since=${dateRange.since}&until=${dateRange.until}&compare=true`,
+    hydrated && dateRange.since && dateRange.until
+      ? `/api/cpa/dashboard/cards?since=${dateRange.since}&until=${dateRange.until}&compare=true`
+      : null,
     cardsFetcher,
     {
       revalidateOnFocus: false,
