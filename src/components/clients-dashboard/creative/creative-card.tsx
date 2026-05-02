@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Image as ImageIcon, Video, Layers, ShoppingBag } from 'lucide-react';
 import type { CreativeListRow } from '@/app/api/clients-dashboard/creative/route';
 import type { CreativeType } from '@/lib/clients-dashboard/types';
@@ -17,6 +18,38 @@ const TYPE_LABELS: Record<CreativeType, string> = {
   carousel: 'קרוסלה',
   collection: 'קולקציה',
 };
+
+type EffectiveStatusKey = 'active' | 'paused' | 'archived';
+
+interface StatusMeta {
+  key: EffectiveStatusKey;
+  label: string;
+  modifier: string;
+}
+
+// Maps any Meta effective_status string to one of three buckets we render
+// as a colored dot in the card's top-right corner.
+function statusMeta(raw: string | null): StatusMeta {
+  const v = (raw || '').toUpperCase();
+  if (v === 'ACTIVE') {
+    return { key: 'active', label: 'פעיל', modifier: 'cd-creative-card__status--active' };
+  }
+  if (
+    v === 'ARCHIVED' ||
+    v === 'DELETED' ||
+    v === 'CAMPAIGN_PAUSED' ||
+    v === 'ADSET_PAUSED' ||
+    v === 'DISAPPROVED'
+  ) {
+    return {
+      key: 'archived',
+      label: v === 'ARCHIVED' || v === 'DELETED' ? 'בארכיון' : 'מושבת',
+      modifier: 'cd-creative-card__status--archived',
+    };
+  }
+  // PAUSED, PENDING_REVIEW, IN_PROCESS, WITH_ISSUES, etc. — treat as paused.
+  return { key: 'paused', label: 'מושהה', modifier: 'cd-creative-card__status--paused' };
+}
 
 function formatCurrency(value: number, currency: string): string {
   const symbol = currency === 'ILS' ? '₪' : currency === 'USD' ? '$' : currency + ' ';
@@ -36,25 +69,47 @@ function TypeIcon({ type, size = 12 }: { type: CreativeType; size?: number }) {
   return <ImageIcon size={size} />;
 }
 
+function ThumbPlaceholder({ type }: { type: CreativeType }) {
+  return (
+    <span className="cd-creative-card__thumb-empty" aria-hidden="true">
+      <TypeIcon type={type} size={28} />
+    </span>
+  );
+}
+
 export default function CreativeCard({ creative, currency, metricType, onClick }: Props) {
-  const isActive = (creative.effectiveStatus || '').toUpperCase() === 'ACTIVE';
+  const status = statusMeta(creative.effectiveStatus);
   const thumb = creative.thumbnailUrl || creative.mediaUrl;
   const isVideo = creative.type === 'video';
   const name = creative.adName || 'ללא שם';
 
+  // If the remote thumb URL fails to load (Meta CDN sometimes rotates), fall
+  // back to the same placeholder we render when there's no URL at all.
+  const [thumbBroken, setThumbBroken] = useState(false);
+  const showThumb = thumb && !thumbBroken;
+
   return (
     <button type="button" className="cd-creative-card" onClick={onClick}>
       <div className="cd-creative-card__thumb">
-        {thumb ? (
+        {showThumb ? (
           isVideo && creative.mediaUrl && /\.mp4($|\?)/i.test(creative.mediaUrl) ? (
-            <video src={creative.mediaUrl} controls preload="metadata" poster={thumb} />
+            <video
+              src={creative.mediaUrl}
+              controls
+              preload="metadata"
+              poster={thumb || undefined}
+              onError={() => setThumbBroken(true)}
+            />
           ) : (
-            <img src={thumb} alt={name} loading="lazy" />
+            <img
+              src={thumb || ''}
+              alt={name}
+              loading="lazy"
+              onError={() => setThumbBroken(true)}
+            />
           )
         ) : (
-          <span className="cd-creative-card__thumb-empty">
-            <TypeIcon type={creative.type} size={28} />
-          </span>
+          <ThumbPlaceholder type={creative.type} />
         )}
 
         <span className="cd-creative-card__type-badge">
@@ -63,12 +118,11 @@ export default function CreativeCard({ creative, currency, metricType, onClick }
         </span>
 
         <span
-          className={
-            'cd-creative-card__status-dot' +
-            (isActive ? '' : ' cd-creative-card__status-dot--off')
-          }
+          className={`cd-creative-card__status ${status.modifier}`}
+          title={creative.effectiveStatus || status.label}
         >
-          {isActive ? 'פעיל' : 'לא פעיל'}
+          <span className="cd-creative-card__status-dot" aria-hidden="true" />
+          {status.label}
         </span>
       </div>
 

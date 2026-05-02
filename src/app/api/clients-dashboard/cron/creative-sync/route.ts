@@ -6,11 +6,11 @@ import {
   syncCreativePerformance,
 } from '@/lib/clients-dashboard/creative-sync';
 
-// GET /api/cron/cd-creative-sync — iterates every active client with a
-// connected Meta account and runs creative discovery + last-30-days perf.
-// Auth: Bearer ${CRON_SECRET}, matching the cd-alerts / ad-sync pattern.
-// Scheduled in vercel.json to run before cd-alerts so the alert run sees
-// fresh creative data.
+// GET /api/clients-dashboard/cron/creative-sync — daily Vercel cron.
+// Iterates every active client with a connected Meta account and runs the
+// same creative discovery + last-30-days perf sync the manual POST uses.
+// Auth: Bearer ${CRON_SECRET}, matching /api/cron/ad-sync and /api/cron/cd-alerts.
+// Schedule lives in vercel.json (04:00 UTC, before cd-alerts at 06:00 UTC).
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 
   try {
     await ensureDatabase();
+
     const accessToken = await getActiveAccessToken();
     if (!accessToken) {
       return NextResponse.json(
@@ -40,14 +41,10 @@ export async function GET(request: NextRequest) {
     startDateD.setDate(today.getDate() - 30);
     const startDate = startDateD.toISOString().split('T')[0];
 
-    const perClient: Array<{
-      clientId: number;
-      name: string;
-      discoverySynced: number;
-      performanceSynced: number;
-      status: 'success' | 'error';
-      error?: string;
-    }> = [];
+    const errors: Array<{ clientId: number; name: string; error: string }> = [];
+    let processed = 0;
+    let discoverySynced = 0;
+    let performanceSynced = 0;
 
     for (const row of clientsResult.rows) {
       const clientId = Number(row.id);
@@ -62,50 +59,32 @@ export async function GET(request: NextRequest) {
           endDate,
           accessToken,
         );
-        perClient.push({
-          clientId,
-          name,
-          discoverySynced: discovery.recordsSynced,
-          performanceSynced: performance.recordsSynced,
-          status:
-            discovery.status === 'error' || performance.status === 'error'
-              ? 'error'
-              : 'success',
-          error: discovery.error || performance.error,
-        });
+        discoverySynced += discovery.recordsSynced;
+        performanceSynced += performance.recordsSynced;
+        processed += 1;
+
+        if (discovery.status === 'error') {
+          errors.push({ clientId, name, error: discovery.error || 'discovery failed' });
+        }
+        if (performance.status === 'error') {
+          errors.push({ clientId, name, error: performance.error || 'performance failed' });
+        }
       } catch (err) {
-        perClient.push({
-          clientId,
-          name,
-          discoverySynced: 0,
-          performanceSynced: 0,
-          status: 'error',
-          error: (err as Error).message,
-        });
+        errors.push({ clientId, name, error: (err as Error).message });
       }
     }
-
-    const totals = perClient.reduce(
-      (acc, c) => {
-        acc.discoverySynced += c.discoverySynced;
-        acc.performanceSynced += c.performanceSynced;
-        if (c.status === 'success') acc.successClients += 1;
-        else acc.errorClients += 1;
-        return acc;
-      },
-      { discoverySynced: 0, performanceSynced: 0, successClients: 0, errorClients: 0 },
-    );
 
     return NextResponse.json({
       success: true,
       range: { startDate, endDate },
-      clientsProcessed: perClient.length,
-      ...totals,
-      perClient,
+      processed,
+      discoverySynced,
+      performanceSynced,
+      errors,
       completedAt: new Date().toISOString(),
     });
   } catch (err) {
-    console.error('[cd-creative-sync cron] Error:', err);
+    console.error('[clients-dashboard/cron/creative-sync] Error:', err);
     return NextResponse.json(
       { error: (err as Error).message },
       { status: 500 },
@@ -113,5 +92,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Allow POST so the same handler can be invoked manually from a curl/cron tester.
+// Allow POST as well so the same handler is callable from a curl/cron tester
+// without having to flip methods — same Bearer auth applies.
 export const POST = GET;

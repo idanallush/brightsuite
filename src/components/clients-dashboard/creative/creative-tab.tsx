@@ -1,19 +1,34 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import useSWR from 'swr';
-import { RefreshCw, Image as ImageIcon } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Image as ImageIcon, RefreshCw } from 'lucide-react';
 import type { ClientSummary, CreativeType } from '@/lib/clients-dashboard/types';
 import type { CreativeListRow } from '@/app/api/clients-dashboard/creative/route';
 import CreativeCard from './creative-card';
-import CreativeModal from './creative-modal';
+
+// Modal is heavy (chart + asset gallery) and only mounts on click — keep it
+// out of the initial bundle for the gallery view.
+const CreativeModal = dynamic(() => import('./creative-modal'), {
+  ssr: false,
+  loading: () => null,
+});
 
 type FilterType = CreativeType | 'all';
+
+interface PaginationMeta {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+}
 
 interface ListResponse {
   creatives: CreativeListRow[];
   range: { startDate: string; endDate: string };
   type: FilterType;
+  pagination: PaginationMeta;
 }
 
 const FILTERS: Array<{ id: FilterType; label: string }> = [
@@ -30,6 +45,9 @@ const RANGES: Array<{ days: number; label: string }> = [
   { days: 30, label: '30 ימים' },
   { days: 90, label: '90 ימים' },
 ];
+
+const PAGE_SIZE = 24;
+const SKELETON_COUNT = 9; // 3×3 grid placeholder.
 
 async function fetcher<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -50,9 +68,23 @@ function isoToday(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+function CreativeCardSkeleton() {
+  return (
+    <div className="cd-creative-card cd-creative-card--skeleton" aria-hidden="true">
+      <div className="cd-creative-card__thumb cd-creative-card__thumb--skeleton" />
+      <div className="cd-creative-card__body">
+        <div className="cd-creative-card__skeleton-line cd-creative-card__skeleton-line--title" />
+        <div className="cd-creative-card__skeleton-line cd-creative-card__skeleton-line--primary" />
+        <div className="cd-creative-card__skeleton-line cd-creative-card__skeleton-line--meta" />
+      </div>
+    </div>
+  );
+}
+
 export default function CreativeTab({ client }: { client: ClientSummary }) {
   const [type, setType] = useState<FilterType>('all');
   const [rangeDays, setRangeDays] = useState<number>(30);
+  const [page, setPage] = useState<number>(1);
   const [openId, setOpenId] = useState<number | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
@@ -60,7 +92,16 @@ export default function CreativeTab({ client }: { client: ClientSummary }) {
   const startDate = useMemo(() => isoDaysAgo(rangeDays), [rangeDays]);
   const endDate = useMemo(() => isoToday(), []);
 
-  const url = `/api/clients-dashboard/creative?clientId=${client.id}&startDate=${startDate}&endDate=${endDate}&type=${type}`;
+  // Reset to first page whenever the filter or date range changes — otherwise
+  // a user on page 5 of "all" can land on an empty page after switching to "video".
+  useEffect(() => {
+    setPage(1);
+  }, [type, rangeDays, client.id]);
+
+  const url =
+    `/api/clients-dashboard/creative?clientId=${client.id}` +
+    `&startDate=${startDate}&endDate=${endDate}&type=${type}` +
+    `&page=${page}&pageSize=${PAGE_SIZE}`;
   const { data, error, isLoading, mutate } = useSWR<ListResponse>(url, fetcher);
 
   async function handleSync() {
@@ -83,6 +124,9 @@ export default function CreativeTab({ client }: { client: ClientSummary }) {
   }
 
   const creatives = data?.creatives || [];
+  const pagination = data?.pagination;
+  const totalPages = pagination?.totalPages ?? 1;
+  const total = pagination?.total ?? 0;
 
   return (
     <div>
@@ -133,7 +177,13 @@ export default function CreativeTab({ client }: { client: ClientSummary }) {
         </div>
       )}
 
-      {isLoading && <div className="cd-empty">טוען קראייטיבים…</div>}
+      {isLoading && (
+        <div className="cd-creative-grid" aria-busy="true" aria-live="polite">
+          {Array.from({ length: SKELETON_COUNT }).map((_, idx) => (
+            <CreativeCardSkeleton key={idx} />
+          ))}
+        </div>
+      )}
       {error && !isLoading && (
         <div className="cd-empty" style={{ color: '#b91c1c' }}>
           שגיאה בטעינה: {(error as Error).message}
@@ -166,24 +216,54 @@ export default function CreativeTab({ client }: { client: ClientSummary }) {
           )}
           {client.hasMeta && (
             <div className="cd-creative-empty__hint">
-              הסנכרון אורך כמה שניות. ירוץ אוטומטית בעתיד; כרגע ידני.
+              הסנכרון רץ אוטומטית פעם ביום; ניתן גם להריץ ידנית מכאן.
             </div>
           )}
         </div>
       )}
 
       {!isLoading && creatives.length > 0 && (
-        <div className="cd-creative-grid">
-          {creatives.map((creative) => (
-            <CreativeCard
-              key={creative.id}
-              creative={creative}
-              currency={client.currency}
-              metricType={client.metricType}
-              onClick={() => setOpenId(creative.id)}
-            />
-          ))}
-        </div>
+        <>
+          <div className="cd-creative-grid">
+            {creatives.map((creative) => (
+              <CreativeCard
+                key={creative.id}
+                creative={creative}
+                currency={client.currency}
+                metricType={client.metricType}
+                onClick={() => setOpenId(creative.id)}
+              />
+            ))}
+          </div>
+
+          {totalPages > 1 && (
+            <div className="cd-creative-pagination">
+              <button
+                type="button"
+                className="cd-creative-pagination__btn"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                aria-label="עמוד קודם"
+              >
+                <ChevronRight size={14} />
+                הקודם
+              </button>
+              <span className="cd-creative-pagination__info cd-mono">
+                עמוד {page} מתוך {totalPages} · {total.toLocaleString('he-IL')} סה״כ
+              </span>
+              <button
+                type="button"
+                className="cd-creative-pagination__btn"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                aria-label="עמוד הבא"
+              >
+                הבא
+                <ChevronLeft size={14} />
+              </button>
+            </div>
+          )}
+        </>
       )}
 
       {openId !== null && (

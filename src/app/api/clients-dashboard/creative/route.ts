@@ -34,10 +34,14 @@ export interface CreativeListRow {
   roas: number | null;
 }
 
+const DEFAULT_PAGE_SIZE = 24;
+const MAX_PAGE_SIZE = 100;
+
 // GET /api/clients-dashboard/creative
 //   ?clientId=X
 //   &startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 //   &type=all|video|image|carousel|collection
+//   &page=1&pageSize=24      (pageSize capped at MAX_PAGE_SIZE)
 // Returns creatives with aggregated perf, sorted by spend desc.
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth();
@@ -63,7 +67,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'invalid type' }, { status: 400 });
   }
 
+  // Pagination — ?page=&pageSize=. Defaults: page=1, pageSize=24, max=100.
+  const pageRaw = Number(search.get('page'));
+  const pageSizeRaw = Number(search.get('pageSize'));
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const pageSize = (() => {
+    if (!Number.isFinite(pageSizeRaw) || pageSizeRaw <= 0) return DEFAULT_PAGE_SIZE;
+    return Math.min(MAX_PAGE_SIZE, Math.floor(pageSizeRaw));
+  })();
+  const offset = (page - 1) * pageSize;
+
   const db = getTurso();
+
+  // Total count (same WHERE / type filter as the data query) so the UI can
+  // render pagination controls without a follow-up roundtrip.
+  const countSql = `
+    SELECT COUNT(*) AS n
+    FROM cd_creatives c
+    WHERE c.client_id = ?
+      ${typeFilter === 'all' ? '' : 'AND c.type = ?'}
+  `;
+  const countArgs: Array<string | number> =
+    typeFilter === 'all' ? [clientId] : [clientId, typeFilter];
+  const countResult = await db.execute({ sql: countSql, args: countArgs });
+  const total = Number(countResult.rows[0]?.n ?? 0);
 
   const sql = `
     SELECT
@@ -92,11 +119,12 @@ export async function GET(request: NextRequest) {
     WHERE c.client_id = ?
       ${typeFilter === 'all' ? '' : 'AND c.type = ?'}
     ORDER BY spend DESC, c.last_seen_at DESC
+    LIMIT ? OFFSET ?
   `;
   const args: Array<string | number> =
     typeFilter === 'all'
-      ? [startDate, endDate, clientId]
-      : [startDate, endDate, clientId, typeFilter];
+      ? [startDate, endDate, clientId, pageSize, offset]
+      : [startDate, endDate, clientId, typeFilter, pageSize, offset];
 
   const result = await db.execute({ sql, args });
 
@@ -137,10 +165,18 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  const totalPages = pageSize > 0 ? Math.max(1, Math.ceil(total / pageSize)) : 1;
+
   return NextResponse.json({
     creatives,
     range: { startDate, endDate },
     type: typeFilter,
+    pagination: {
+      page,
+      pageSize,
+      total,
+      totalPages,
+    },
   });
 }
 

@@ -35,7 +35,7 @@
     "src/app/api/cron/cd-alerts/route.ts": {
       "maxDuration": 120
     },
-    "src/app/api/cron/cd-creative-sync/route.ts": {
+    "src/app/api/clients-dashboard/cron/creative-sync/route.ts": {
       "maxDuration": 300
     }
   },
@@ -53,7 +53,7 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/cd-creative-sync",
+      "path": "/api/clients-dashboard/cron/creative-sync",
       "schedule": "0 4 * * *"
     },
     {
