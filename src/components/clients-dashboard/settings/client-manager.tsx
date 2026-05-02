@@ -273,15 +273,15 @@ export const ClientManager = () => {
 
       if (!res.ok) {
         const data = await res.json();
-        toast.error(data.error || 'שגיאה במחיקת לקוח');
+        toast.error(data.error || 'שגיאה בהעברת הלקוח לארכיון');
         return;
       }
 
-      toast.success('לקוח נמחק בהצלחה');
+      toast.success('הלקוח הועבר לארכיון');
       setDeletingId(null);
       mutate();
     } catch {
-      toast.error('שגיאה במחיקת לקוח');
+      toast.error('שגיאה בהעברת הלקוח לארכיון');
     }
   };
 
@@ -662,7 +662,7 @@ export const ClientManager = () => {
                             onClick={() => handleDelete(clientId)}
                             className="p-1.5 rounded-md transition-colors"
                             style={{ background: '#c0392b', color: '#fff' }}
-                            title="אישור מחיקה"
+                            title="אישור העברה לארכיון"
                           >
                             <Check size={14} />
                           </button>
@@ -689,7 +689,7 @@ export const ClientManager = () => {
                             onClick={() => setDeletingId(clientId)}
                             className="p-1.5 rounded-md transition-colors hover:opacity-80"
                             style={{ color: '#c0392b' }}
-                            title="מחיקה"
+                            title="העבר לארכיון"
                           >
                             <Trash2 size={14} />
                           </button>

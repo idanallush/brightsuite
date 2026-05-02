@@ -4,7 +4,8 @@ import '../styles.css';
 import { useState, use } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid } from 'lucide-react';
+import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid, Archive } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ClientSummary, MetricType } from '@/lib/clients-dashboard/types';
 import CampaignsTab from '@/components/clients-dashboard/campaigns/campaigns-tab';
 import CreativeTab from '@/components/clients-dashboard/creative/creative-tab';
@@ -80,6 +81,27 @@ export default function ClientDetailPage({
   const [tab, setTab] = useState<Tab>('campaigns');
   const [savingType, setSavingType] = useState(false);
   const [typeError, setTypeError] = useState<string | null>(null);
+  const [restoring, setRestoring] = useState(false);
+
+  async function handleRestore() {
+    if (!client || restoring) return;
+    setRestoring(true);
+    try {
+      const res = await fetch(`/api/clients-dashboard/clients/${client.id}/restore`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed: ${res.status}`);
+      }
+      toast.success('הלקוח שוחזר');
+      await mutate();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בשחזור');
+    } finally {
+      setRestoring(false);
+    }
+  }
 
   async function handleMetricTypeChange(next: MetricType) {
     if (!client || client.metricType === next || savingType) return;
@@ -129,6 +151,7 @@ export default function ClientDetailPage({
   }
 
   const isEcom = client.metricType === 'ecommerce';
+  const isArchived = !client.isActive;
 
   return (
     <div className="cd-root">
@@ -137,11 +160,29 @@ export default function ClientDetailPage({
         חזרה לרשימת לקוחות
       </Link>
 
+      {isArchived && (
+        <div className="cd-archived-banner">
+          <Archive size={14} />
+          <span>לקוח בארכיון — שחזר כדי לערוך</span>
+          {isAdmin && (
+            <button
+              type="button"
+              className="cd-pill cd-pill--active"
+              onClick={handleRestore}
+              disabled={restoring}
+              style={{ marginInlineStart: 'auto' }}
+            >
+              {restoring ? 'משחזר…' : 'שחזר'}
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="cd-detail-head">
         <div>
           <h1 className="cd-detail-name">{client.name}</h1>
           <div className="cd-detail-meta">
-            {isAdmin ? (
+            {isAdmin && !isArchived ? (
               <div className="cd-metric-toggle" role="group" aria-label="סוג מדידה">
                 <button
                   type="button"

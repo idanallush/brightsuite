@@ -4,7 +4,9 @@ import './styles.css';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { Search, AlertTriangle, Settings } from 'lucide-react';
+import { toast } from 'sonner';
+import { Search, AlertTriangle, Settings, Archive, ChevronDown, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { useAuth } from '@/hooks/use-auth';
 import type { ClientSummary, MetricType } from '@/lib/clients-dashboard/types';
 
 type ApiResponse = {
@@ -51,13 +53,24 @@ export default function ClientsDashboardPage() {
   const [rangeId, setRangeId] = useState<string>('30d');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<'all' | MetricType>('all');
+  const [archiveOpen, setArchiveOpen] = useState(false);
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
 
   const range = RANGE_PRESETS.find((r) => r.id === rangeId) ?? RANGE_PRESETS[2];
   const startDate = isoDaysAgo(range.days);
   const endDate = isoToday();
 
   const apiUrl = `/api/clients-dashboard/clients?startDate=${startDate}&endDate=${endDate}`;
-  const { data, error, isLoading } = useSWR<ApiResponse>(apiUrl, fetcher);
+  const { data, error, isLoading, mutate: mutateActive } = useSWR<ApiResponse>(apiUrl, fetcher);
+
+  // Lazy-load archived clients only when the user expands the section.
+  const archivedUrl = `/api/clients-dashboard/clients?startDate=${startDate}&endDate=${endDate}&includeArchived=1`;
+  const {
+    data: archivedData,
+    isLoading: archivedLoading,
+    mutate: mutateArchived,
+  } = useSWR<ApiResponse>(archiveOpen ? archivedUrl : null, fetcher);
 
   const filteredClients = useMemo(() => {
     const all = data?.clients ?? [];
@@ -209,6 +222,157 @@ export default function ClientsDashboardPage() {
           </tbody>
         </table>
       </div>
+
+      <ArchiveSection
+        open={archiveOpen}
+        onToggle={() => setArchiveOpen((v) => !v)}
+        clients={archivedData?.clients ?? []}
+        isLoading={archivedLoading}
+        isAdmin={isAdmin}
+        onRestored={() => {
+          // Refresh both lists — archived row leaves, active row arrives.
+          void mutateArchived();
+          void mutateActive();
+        }}
+      />
+    </div>
+  );
+}
+
+function ArchiveSection({
+  open,
+  onToggle,
+  clients,
+  isLoading,
+  isAdmin,
+  onRestored,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  clients: ClientSummary[];
+  isLoading: boolean;
+  isAdmin: boolean;
+  onRestored: () => void;
+}) {
+  const [busyId, setBusyId] = useState<number | null>(null);
+
+  const handleRestore = async (id: number) => {
+    if (busyId !== null) return;
+    setBusyId(id);
+    try {
+      const res = await fetch(`/api/clients-dashboard/clients/${id}/restore`, {
+        method: 'POST',
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `Request failed: ${res.status}`);
+      }
+      toast.success('הלקוח שוחזר');
+      onRestored();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בשחזור');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  return (
+    <div className="cd-archive-section">
+      <button
+        type="button"
+        className="cd-archive-section__toggle"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
+        {open ? <ChevronDown size={14} /> : <ChevronRightIcon size={14} />}
+        <Archive size={14} />
+        <span>ארכיון</span>
+        {open && clients.length > 0 && (
+          <span className="cd-archive-section__count">{clients.length}</span>
+        )}
+      </button>
+      {open && (
+        <div className="cd-card cd-card--flush" style={{ marginTop: 8 }}>
+          <table className="cd-table">
+            <thead>
+              <tr>
+                <th>לקוח</th>
+                <th>סוג</th>
+                <th>פלטפורמות</th>
+                <th className="cd-num">הוצאה</th>
+                <th>פעולות</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading && (
+                <tr>
+                  <td colSpan={5} className="cd-empty">
+                    טוען לקוחות בארכיון…
+                  </td>
+                </tr>
+              )}
+              {!isLoading && clients.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="cd-empty">
+                    אין לקוחות בארכיון
+                  </td>
+                </tr>
+              )}
+              {clients.map((c) => (
+                <tr key={c.id}>
+                  <td>
+                    <Link
+                      href={`/clients-dashboard/${c.id}`}
+                      style={{ color: 'inherit', textDecoration: 'none', fontWeight: 600 }}
+                    >
+                      {c.name}
+                    </Link>
+                    <div style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{c.slug}</div>
+                  </td>
+                  <td>
+                    <span className={`cd-tag cd-pill--${c.metricType}`}>
+                      {c.metricType === 'ecommerce' ? 'איקומרס' : 'לידים'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="cd-platforms">
+                      <span
+                        className={`cd-platform-dot ${c.hasMeta ? 'cd-platform-dot--meta' : 'cd-platform-dot--off'}`}
+                        title="Meta"
+                      />
+                      <span
+                        className={`cd-platform-dot ${c.hasGoogle ? 'cd-platform-dot--google' : 'cd-platform-dot--off'}`}
+                        title="Google Ads"
+                      />
+                      <span
+                        className={`cd-platform-dot ${c.hasGa4 ? 'cd-platform-dot--ga4' : 'cd-platform-dot--off'}`}
+                        title="GA4"
+                      />
+                    </span>
+                  </td>
+                  <td className="cd-mono cd-num">{formatCurrency(c.totalSpend, c.currency)}</td>
+                  <td>
+                    {isAdmin ? (
+                      <button
+                        type="button"
+                        className="cd-pill cd-pill--active"
+                        onClick={() => handleRestore(c.id)}
+                        disabled={busyId === c.id}
+                      >
+                        {busyId === c.id ? 'משחזר…' : 'שחזר'}
+                      </button>
+                    ) : (
+                      <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>
+                        נדרשת הרשאת אדמין
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

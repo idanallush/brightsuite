@@ -3,9 +3,13 @@ import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
 import type { CampaignChangeRecord } from '@/lib/clients-dashboard/types';
 
-// GET /api/clients-dashboard/history?clientId=X&campaignId=Y&startDate=Z&endDate=W&page=N&pageSize=M
+// GET /api/clients-dashboard/history?clientId=X&campaignId=Y&startDate=Z&endDate=W&page=N&pageSize=M&includeClient=1
 // Returns the campaign change timeline (joined with ah_campaigns.name) plus a
 // daily time-series of spend / conversions / revenue for the chart.
+// `includeClient=1` adds a `clientChanges` array (most recent 20 entries from
+// cd_client_changes for this client). The campaign-level timeline still
+// honors startDate/endDate; client-level changes are not date-filtered (small
+// per-client volume — admin-only edits).
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
@@ -132,6 +136,49 @@ export async function GET(request: NextRequest) {
     revenue: Number(row.revenue ?? 0),
   }));
 
+  // Optional client-level change log — small per-client volume, no date filter.
+  let clientChanges:
+    | Array<{
+        id: number;
+        clientId: number;
+        field: string;
+        oldValue: string | null;
+        newValue: string | null;
+        userId: number | null;
+        source: 'user' | 'system';
+        note: string | null;
+        detectedAt: string;
+        userName: string | null;
+      }>
+    | undefined;
+  if (search.get('includeClient') === '1') {
+    const ccResult = await db.execute({
+      sql: `
+        SELECT cc.id, cc.client_id, cc.field, cc.old_value, cc.new_value,
+               cc.user_id, cc.source, cc.note, cc.detected_at,
+               u.name AS user_name
+        FROM cd_client_changes cc
+        LEFT JOIN bs_users u ON u.id = cc.user_id
+        WHERE cc.client_id = ?
+        ORDER BY cc.detected_at DESC
+        LIMIT 20
+      `,
+      args: [clientId],
+    });
+    clientChanges = ccResult.rows.map((row) => ({
+      id: Number(row.id),
+      clientId: Number(row.client_id),
+      field: String(row.field),
+      oldValue: (row.old_value as string | null) ?? null,
+      newValue: (row.new_value as string | null) ?? null,
+      userId: row.user_id != null ? Number(row.user_id) : null,
+      source: row.source as 'user' | 'system',
+      note: (row.note as string | null) ?? null,
+      detectedAt: String(row.detected_at),
+      userName: (row.user_name as string | null) ?? null,
+    }));
+  }
+
   return NextResponse.json({
     changes,
     total,
@@ -146,6 +193,7 @@ export async function GET(request: NextRequest) {
       status: (r.status as string | null) ?? null,
     })),
     range: { startDate, endDate },
+    ...(clientChanges !== undefined ? { clientChanges } : {}),
   });
 }
 

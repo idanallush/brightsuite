@@ -49,6 +49,19 @@ interface HistorySeriesPoint {
   revenue: number;
 }
 
+interface ClientChange {
+  id: number;
+  clientId: number;
+  field: string;
+  oldValue: string | null;
+  newValue: string | null;
+  userId: number | null;
+  source: 'user' | 'system';
+  note: string | null;
+  detectedAt: string;
+  userName: string | null;
+}
+
 interface HistoryResponse {
   changes: HistoryChange[];
   total: number;
@@ -57,6 +70,7 @@ interface HistoryResponse {
   series: HistorySeriesPoint[];
   campaigns: HistoryCampaign[];
   range: { startDate: string; endDate: string };
+  clientChanges?: ClientChange[];
 }
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -72,6 +86,29 @@ const FIELD_LABEL: Record<string, string> = {
   name: 'שם',
   objective: 'יעד',
 };
+
+// Hebrew labels for cd_client_changes.field values. Falls back to the raw key
+// for any field we haven't translated yet.
+const CLIENT_FIELD_LABEL: Record<string, string> = {
+  name: 'שם לקוח',
+  metric_type: 'סוג מדידה',
+  meta_account_id: 'חשבון Meta',
+  google_customer_id: 'חשבון Google',
+  google_mcc_id: 'Google MCC',
+  ga4_property_id: 'GA4 Property',
+  currency: 'מטבע',
+  is_active: 'סטטוס פעילות',
+};
+
+function formatClientValue(field: string, value: string | null): string {
+  if (value === null || value === '') return '—';
+  if (field === 'is_active') return value === '1' ? 'פעיל' : 'בארכיון';
+  if (field === 'metric_type') {
+    if (value === 'leads') return 'לידים';
+    if (value === 'ecommerce') return 'איקומרס';
+  }
+  return value;
+}
 
 const PAGE_SIZE_OPTIONS = [50, 100, 200] as const;
 const DEFAULT_PAGE_SIZE = 100;
@@ -117,6 +154,7 @@ export default function HistoryTab({ client }: HistoryTabProps) {
       clientId: String(client.id),
       page: String(page),
       pageSize: String(pageSize),
+      includeClient: '1',
     });
     if (campaignId) params.set('campaignId', campaignId);
     return `/api/clients-dashboard/history?${params.toString()}`;
@@ -223,6 +261,11 @@ export default function HistoryTab({ client }: HistoryTabProps) {
         />
       )}
 
+      <ClientChangesSection
+        changes={data?.clientChanges ?? []}
+        isLoading={isLoading && !data}
+      />
+
       <div className="cd-history-timeline">
         <div className="cd-history-timeline__head">
           <h3>היסטוריית עריכות</h3>
@@ -310,6 +353,68 @@ export default function HistoryTab({ client }: HistoryTabProps) {
             </button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Client-level changes section (cd_client_changes)
+// ============================================================
+
+function ClientChangesSection({
+  changes,
+  isLoading,
+}: {
+  changes: ClientChange[];
+  isLoading: boolean;
+}) {
+  return (
+    <div className="cd-history-timeline">
+      <div className="cd-history-timeline__head">
+        <h3>שינויי לקוח</h3>
+        <span className="cd-card__hint">20 השינויים האחרונים ברמת הלקוח</span>
+      </div>
+      {isLoading ? (
+        <div className="cd-history-timeline__list">
+          {[1, 2].map((i) => (
+            <div key={i} className="cd-history-row cd-history-row--skeleton" />
+          ))}
+        </div>
+      ) : changes.length === 0 ? (
+        <div className="cd-empty">
+          <strong>אין שינויי לקוח</strong>
+          <div>לא נרשמו עריכות פרטי לקוח עדיין.</div>
+        </div>
+      ) : (
+        <div className="cd-history-timeline__list">
+          {changes.map((c) => (
+            <ClientChangeRow key={c.id} change={c} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ClientChangeRow({ change }: { change: ClientChange }) {
+  const fieldLabel = CLIENT_FIELD_LABEL[change.field] ?? change.field;
+  const oldDisplay = formatClientValue(change.field, change.oldValue);
+  const newDisplay = formatClientValue(change.field, change.newValue);
+  const desc = `${fieldLabel}: ${oldDisplay} → ${newDisplay}`;
+  return (
+    <div className="cd-history-row">
+      <div className="cd-history-row__date">{formatDate(change.detectedAt)}</div>
+      <div className="cd-history-row__campaign">
+        פרטי לקוח
+        <span className="cd-history-row__platform">{fieldLabel}</span>
+      </div>
+      <div className="cd-history-row__desc">{desc}</div>
+      <div className="cd-history-row__source">
+        <span className={`cd-history-source cd-history-source--${change.source}`}>
+          {SOURCE_LABEL[change.source]}
+          {change.source === 'user' && change.userName ? ` · ${change.userName}` : ''}
+        </span>
       </div>
     </div>
   );

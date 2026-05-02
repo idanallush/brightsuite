@@ -9,15 +9,23 @@ import type { ClientSummary } from '@/lib/clients-dashboard/types';
 //
 // `?raw=1` returns the underlying ah_clients rows untransformed — used by the
 // settings client manager which needs the raw account IDs to populate the form.
+// `?includeArchived=1` returns ONLY archived (is_active=0) clients — drives
+// the "ארכיון" section on the list page. Default behavior (no flag) still
+// returns only active clients.
 export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams;
-  if (search.get('raw') === '1') return getRawClients();
+  if (search.get('raw') === '1') {
+    return getRawClients(search.get('includeArchived') === '1');
+  }
 
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
 
   const startDate = search.get('startDate') || getMonthStart();
   const endDate = search.get('endDate') || getToday();
+  const includeArchived = search.get('includeArchived') === '1';
+  // includeArchived=1 → only archived clients (separate section in the UI).
+  const activeFilter = includeArchived ? 'c.is_active = 0' : 'c.is_active = 1';
 
   const db = getTurso();
 
@@ -64,7 +72,7 @@ export async function GET(request: NextRequest) {
         WHERE status = 'success'
         GROUP BY client_id
       ) s ON s.client_id = c.id
-      WHERE c.is_active = 1
+      WHERE ${activeFilter}
       ORDER BY total_spend DESC, c.name ASC
     `,
     args: [startDate, endDate],
@@ -107,15 +115,17 @@ export async function GET(request: NextRequest) {
 
 // Raw client rows — used by the settings client manager which needs the
 // underlying ah_clients fields (meta_account_id, google_customer_id, etc.).
-async function getRawClients() {
+// includeArchived=true returns ONLY archived clients (is_active=0), matching
+// the enriched list endpoint's contract.
+async function getRawClients(includeArchived: boolean) {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
 
   const db = getTurso();
-  const result = await db.execute({
-    sql: `SELECT * FROM ah_clients WHERE is_active = 1 ORDER BY name ASC`,
-    args: [],
-  });
+  const sql = includeArchived
+    ? `SELECT * FROM ah_clients WHERE is_active = 0 ORDER BY name ASC`
+    : `SELECT * FROM ah_clients WHERE is_active = 1 ORDER BY name ASC`;
+  const result = await db.execute({ sql, args: [] });
   return NextResponse.json({ clients: result.rows });
 }
 

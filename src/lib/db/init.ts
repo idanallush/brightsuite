@@ -235,6 +235,22 @@ export async function initDatabase(): Promise<void> {
       UNIQUE(creative_id, date)
     );
 
+    -- Client-level edit history (renames, metric_type swaps, account-id
+    -- changes, soft-delete via is_active flip). Mirrors cd_campaign_changes
+    -- but scoped to ah_clients rows. source: 'user' | 'system' (no 'sync'
+    -- because client-level changes only happen via the dashboard UI / API).
+    CREATE TABLE IF NOT EXISTS cd_client_changes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      client_id INTEGER NOT NULL REFERENCES ah_clients(id) ON DELETE CASCADE,
+      field TEXT NOT NULL,
+      old_value TEXT,
+      new_value TEXT,
+      user_id INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
+      source TEXT NOT NULL DEFAULT 'user' CHECK (source IN ('user', 'system')),
+      note TEXT,
+      detected_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     -- Campaign edit history. Detected via diffing campaign snapshots on each
     -- sync, or written explicitly by user actions in the dashboard.
     CREATE TABLE IF NOT EXISTS cd_campaign_changes (
@@ -289,6 +305,7 @@ export async function initDatabase(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_cd_creatives_client ON cd_creatives(client_id);
     CREATE INDEX IF NOT EXISTS idx_cd_creative_perf ON cd_creative_performance(creative_id, date);
+    CREATE INDEX IF NOT EXISTS idx_cd_client_changes_client ON cd_client_changes(client_id, detected_at DESC);
     CREATE INDEX IF NOT EXISTS idx_cd_changes_client ON cd_campaign_changes(client_id, detected_at);
     CREATE INDEX IF NOT EXISTS idx_cd_changes_campaign ON cd_campaign_changes(campaign_id, detected_at);
     CREATE INDEX IF NOT EXISTS idx_cd_alerts_client_status ON cd_alerts(client_id, status, severity);
