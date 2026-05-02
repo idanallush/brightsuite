@@ -306,10 +306,13 @@ export async function initDatabase(): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_cd_creatives_client ON cd_creatives(client_id);
     CREATE INDEX IF NOT EXISTS idx_cd_creative_perf ON cd_creative_performance(creative_id, date);
+    CREATE INDEX IF NOT EXISTS idx_cd_creative_performance_date ON cd_creative_performance(date);
     CREATE INDEX IF NOT EXISTS idx_cd_client_changes_client ON cd_client_changes(client_id, detected_at DESC);
     CREATE INDEX IF NOT EXISTS idx_cd_changes_client ON cd_campaign_changes(client_id, detected_at);
     CREATE INDEX IF NOT EXISTS idx_cd_changes_campaign ON cd_campaign_changes(campaign_id, detected_at);
+    CREATE INDEX IF NOT EXISTS idx_cd_campaign_changes_user_id ON cd_campaign_changes(user_id);
     CREATE INDEX IF NOT EXISTS idx_cd_alerts_client_status ON cd_alerts(client_id, status, severity);
+    CREATE INDEX IF NOT EXISTS idx_cd_alerts_created_at ON cd_alerts(created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_cd_views_user ON cd_user_views(user_id, scope);
 
     -- CPA Dashboard: per-user saved views (filters / hidden client-id sets / sort).
