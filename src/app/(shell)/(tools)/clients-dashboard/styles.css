@@ -1845,3 +1845,177 @@
   background: rgba(168, 85, 247, 0.12);
   color: #7e22ce;
 }
+
+/* ============================================================
+   Searchable select (combobox) — used in History + Backfill
+   ============================================================ */
+
+.cd-ss {
+  position: relative;
+  display: inline-block;
+  min-width: 220px;
+}
+
+.cd-ss--full {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+.cd-ss__trigger {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-align: right;
+  cursor: pointer;
+}
+
+.cd-ss__trigger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cd-ss__trigger-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-ss__placeholder {
+  color: var(--text-tertiary);
+}
+
+.cd-ss__chev {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.cd-ss__popover {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  left: 0;
+  z-index: 40;
+  background: var(--card-bg, #fff);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  overflow: hidden;
+}
+
+.cd-ss__search {
+  position: relative;
+  padding: 8px;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.cd-ss__input {
+  width: 100%;
+  text-align: right;
+  direction: rtl;
+}
+
+.cd-ss__clear {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  color: var(--text-tertiary);
+  cursor: pointer;
+}
+
+.cd-ss__clear:hover {
+  color: var(--text-primary);
+}
+
+.cd-ss__list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px;
+}
+
+.cd-ss__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 36px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text-primary);
+  text-align: right;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cd-ss__item--highlighted {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.cd-ss__item--selected {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.cd-ss__empty {
+  padding: 14px;
+  font-size: 12.5px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.cd-ss__item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cd-ss__pill {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: var(--glass-bg);
+  color: var(--text-tertiary);
+  border: 1px solid var(--glass-border);
+  flex-shrink: 0;
+}
+
+.cd-ss__pill--meta {
+  background: rgba(24, 119, 242, 0.12);
+  color: #1d4ed8;
+  border-color: rgba(24, 119, 242, 0.24);
+}
+
+.cd-ss__pill--google {
+  background: rgba(234, 67, 53, 0.10);
+  color: #b91c1c;
+  border-color: rgba(234, 67, 53, 0.22);
+}
+
+.cd-ss__pill--ga4 {
+  background: rgba(168, 85, 247, 0.12);
+  color: #7e22ce;
+  border-color: rgba(168, 85, 247, 0.22);
+}

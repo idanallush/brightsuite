@@ -142,6 +142,7 @@ export async function GET(request: NextRequest) {
       id: Number(r.id),
       name: String(r.name),
       platform: String(r.platform),
+      platformCampaignId: (r.platform_campaign_id as string | null) ?? null,
       status: (r.status as string | null) ?? null,
     })),
     range: { startDate, endDate },

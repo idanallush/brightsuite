@@ -1,9 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  SearchableSelect,
+  type SearchableSelectItem,
+} from '@/components/clients-dashboard/ui/searchable-select';
 
 interface RawClientsResponse {
   clients: Record<string, unknown>[];
@@ -29,6 +33,21 @@ export const BackfillForm = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const clientItems = useMemo<SearchableSelectItem[]>(
+    () =>
+      clients.map((c) => {
+        const id = String(c.id as number);
+        const name = (c.name as string) ?? '';
+        const slug = (c.slug as string | null) ?? '';
+        return {
+          key: id,
+          label: name,
+          searchText: `${name} ${slug}`.toLowerCase(),
+        };
+      }),
+    [clients],
+  );
 
   const handleBackfill = async () => {
     if (!clientId || !startDate || !endDate) {
@@ -113,17 +132,14 @@ export const BackfillForm = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div>
           <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>לקוח</label>
-          <select
+          <SearchableSelect
+            items={clientItems}
             value={clientId}
-            onChange={(e) => setClientId(e.target.value)}
-            className="w-full text-sm px-3 py-2 rounded-lg border"
-            style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
-          >
-            <option value="">בחירת לקוח</option>
-            {clients.map((c) => (
-              <option key={c.id as number} value={c.id as number}>{c.name as string}</option>
-            ))}
-          </select>
+            onChange={setClientId}
+            placeholder="בחר לקוח"
+            searchPlaceholder="חפש לקוח…"
+            className="cd-ss--full"
+          />
         </div>
 
         <div>

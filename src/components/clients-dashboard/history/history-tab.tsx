@@ -6,6 +6,11 @@ import useSWR from 'swr';
 import { ChevronLeft, ChevronRight, Pencil, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { ClientSummary } from '@/lib/clients-dashboard/types';
+import {
+  PlatformPill,
+  SearchableSelect,
+  type SearchableSelectItem,
+} from '@/components/clients-dashboard/ui/searchable-select';
 
 interface HistoryTabProps {
   client: ClientSummary;
@@ -33,6 +38,7 @@ interface HistoryCampaign {
   id: number;
   name: string;
   platform: string;
+  platformCampaignId: string | null;
   status: string | null;
 }
 
@@ -159,23 +165,39 @@ export default function HistoryTab({ client }: HistoryTabProps) {
     }
   };
 
+  const campaignItems = useMemo<SearchableSelectItem[]>(
+    () =>
+      (data?.campaigns ?? []).map((c) => {
+        const idStr = String(c.id);
+        const platformId = c.platformCampaignId ?? '';
+        return {
+          key: idStr,
+          label: c.name,
+          searchText: `${c.name} ${platformId}`.toLowerCase(),
+          render: (
+            <>
+              <span className="cd-ss__item-label">{c.name}</span>
+              <PlatformPill platform={c.platform} />
+            </>
+          ),
+        };
+      }),
+    [data?.campaigns],
+  );
+
   return (
     <div className="cd-history-tab">
       <div className="cd-history-toolbar">
         <label className="cd-history-toolbar__label">
           קמפיין:
-          <select
-            className="cd-select"
+          <SearchableSelect
+            items={campaignItems}
             value={campaignId}
-            onChange={(e) => handleCampaignChange(e.target.value)}
-          >
-            <option value="">כל הקמפיינים</option>
-            {(data?.campaigns ?? []).map((c) => (
-              <option key={c.id} value={c.id}>
-                [{c.platform}] {c.name}
-              </option>
-            ))}
-          </select>
+            onChange={handleCampaignChange}
+            placeholder="כל הקמפיינים"
+            searchPlaceholder="חפש קמפיין…"
+            clearOptionLabel="כל הקמפיינים"
+          />
         </label>
         <button
           type="button"
