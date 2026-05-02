@@ -10,7 +10,7 @@
 //   - 'leads'     → spend, conversions (leads), CPL, CPC primary
 //   - 'ecommerce' → spend, revenue, ROAS, conversions (purchases) primary
 
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import useSWR from 'swr';
 import {
   ArrowUpDown,
@@ -21,10 +21,19 @@ import {
   Printer,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import type { ClientSummary, Platform } from '@/lib/clients-dashboard/types';
-import type { CampaignRow, CampaignsApiResponse } from '@/lib/clients-dashboard/campaigns';
+import type {
+  CampaignRow,
+  CampaignsApiResponse,
+  CampaignsTotals,
+} from '@/lib/clients-dashboard/campaigns';
 import DailyChart from './daily-chart';
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200] as const;
+const DEFAULT_PAGE_SIZE = 50;
 
 // =====================================================
 // Helpers
@@ -314,17 +323,47 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
   // Date range from URL params if present, else last 30 days.
   const [range, setRange] = useState(() => readRangeFromUrl());
 
-  const [search, setSearch] = useState('');
-  const [platform, setPlatform] = useState<PlatformFilter>('all');
-  const [sortKey, setSortKey] = useState<SortKey>('spend');
-  const [sortDir, setSortDir] = useState<SortDir>('desc');
+  // Hydrate filter / sort / pagination state from URL on first mount, same
+  // pattern as the existing date-range hydration. Subsequent changes write
+  // back via history.replaceState so reload preserves them.
+  const [search, setSearch] = useState<string>(() => readUrlState().q);
+  const [platform, setPlatform] = useState<PlatformFilter>(() => readUrlState().platform);
+  const [sortKey, setSortKey] = useState<SortKey>(() => readUrlState().sortKey);
+  const [sortDir, setSortDir] = useState<SortDir>(() => readUrlState().sortDir);
+  const [page, setPage] = useState<number>(() => readUrlState().page);
+  const [pageSize, setPageSize] = useState<number>(() => readUrlState().pageSize);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  // Print: temporarily render every row (not just the current page) so the
+  // print stylesheet sees the full list. We swap rows into local state for
+  // one tick, call window.print(), then restore.
+  const [printRows, setPrintRows] = useState<CampaignRow[] | null>(null);
 
   const isEcom = client.metricType === 'ecommerce';
   const columns = useMemo(() => buildColumns(client.metricType), [client.metricType]);
   const primaryMetric: 'revenue' | 'conversions' = isEcom ? 'revenue' : 'conversions';
 
-  const listKey = `/api/clients-dashboard/campaigns?clientId=${client.id}&startDate=${range.startDate}&endDate=${range.endDate}`;
+  // Server-side filter/sort/pagination — push every state into the API key
+  // so SWR caches each combination separately. The server returns the
+  // current page in `campaigns`, the deduped count in `total`, and aggregated
+  // metrics across the entire filtered set in `totals` (so the footer is
+  // correct under pagination).
+  const listParams = useMemo(() => {
+    const p = new URLSearchParams();
+    p.set('clientId', String(client.id));
+    p.set('startDate', range.startDate);
+    p.set('endDate', range.endDate);
+    p.set('sortKey', sortKey);
+    p.set('sortDir', sortDir);
+    p.set('page', String(page));
+    p.set('pageSize', String(pageSize));
+    if (platform !== 'all') p.set('platform', platform);
+    const q = search.trim();
+    if (q) p.set('q', q);
+    return p.toString();
+  }, [client.id, range, sortKey, sortDir, page, pageSize, platform, search]);
+
+  const listKey = `/api/clients-dashboard/campaigns?${listParams}`;
   const { data, error, isLoading } = useSWR<CampaignsApiResponse>(listKey, fetcher);
 
   const dailyKey = expandedKey
@@ -335,23 +374,50 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
     fetcher,
   );
 
-  const filtered = useMemo(() => {
-    const raw = data?.campaigns ?? [];
-    const q = search.trim().toLowerCase();
-    return raw.filter((r) => {
-      if (platform !== 'all' && r.platform !== platform) return false;
-      if (q && !r.name.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [data, platform, search]);
+  // Server already filtered, sorted, and paginated. The list we render is
+  // exactly what came back.
+  const rows: CampaignRow[] = data?.campaigns ?? [];
+  const totalRows = data?.total ?? 0;
+  const apiTotals: CampaignsTotals | null = data?.totals ?? null;
 
-  const sorted = useMemo(() => {
-    const arr = [...filtered];
-    arr.sort((a, b) => compareRows(a, b, sortKey, sortDir));
-    return arr;
-  }, [filtered, sortKey, sortDir]);
+  // Reset page → 1 when filters / date range / sort / pageSize change. Skip
+  // the very first run so we don't clobber a `?page=N` that came in from the
+  // URL on initial load.
+  const firstRunRef = useRef(true);
+  useEffect(() => {
+    if (firstRunRef.current) {
+      firstRunRef.current = false;
+      return;
+    }
+    setPage(1);
+  }, [search, platform, range.startDate, range.endDate, sortKey, sortDir, pageSize]);
 
-  const totals = useMemo(() => aggregateTotals(sorted), [sorted]);
+  // Persist page / pageSize / filters back into the URL so reload keeps them.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    // Date range — preserve existing convention (read-only previously, but
+    // safe to write back since the format matches).
+    params.set('startDate', range.startDate);
+    params.set('endDate', range.endDate);
+    if (page !== 1) params.set('page', String(page));
+    else params.delete('page');
+    if (pageSize !== DEFAULT_PAGE_SIZE) params.set('pageSize', String(pageSize));
+    else params.delete('pageSize');
+    if (platform !== 'all') params.set('platform', platform);
+    else params.delete('platform');
+    const q = search.trim();
+    if (q) params.set('q', q);
+    else params.delete('q');
+    if (sortKey !== 'spend') params.set('sortKey', sortKey);
+    else params.delete('sortKey');
+    if (sortDir !== 'desc') params.set('sortDir', sortDir);
+    else params.delete('sortDir');
+    const next = params.toString();
+    const url =
+      window.location.pathname + (next ? '?' + next : '') + window.location.hash;
+    window.history.replaceState({}, '', url);
+  }, [page, pageSize, platform, search, sortKey, sortDir, range]);
 
   const handleSort = useCallback(
     (key: SortKey) => {
@@ -367,17 +433,55 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
     [sortKey, columns],
   );
 
-  const handleExportCsv = useCallback(() => {
-    const csv = rowsToCsv(columns, sorted);
-    const fname = `${client.slug}-campaigns-${range.startDate}_${range.endDate}.csv`;
-    downloadCsv(fname, csv);
-  }, [columns, sorted, client.slug, range]);
+  // Fetch the entire filtered set (bypassing pagination) for export / print.
+  // Uses ?all=1 to signal to the API that we want every row in one shot.
+  const fetchAllRows = useCallback(async (): Promise<CampaignRow[]> => {
+    const p = new URLSearchParams();
+    p.set('clientId', String(client.id));
+    p.set('startDate', range.startDate);
+    p.set('endDate', range.endDate);
+    p.set('sortKey', sortKey);
+    p.set('sortDir', sortDir);
+    p.set('all', '1');
+    if (platform !== 'all') p.set('platform', platform);
+    const q = search.trim();
+    if (q) p.set('q', q);
+    const allData = await fetcher<CampaignsApiResponse>(
+      `/api/clients-dashboard/campaigns?${p.toString()}`,
+    );
+    return allData.campaigns ?? [];
+  }, [client.id, range, sortKey, sortDir, platform, search]);
 
-  const handlePrintPdf = useCallback(() => {
-    // window.print() respects the @media print rules in styles.css and the
-    // .cd-camp-print-only / .cd-camp-no-print toggles.
-    window.print();
-  }, []);
+  const handleExportCsv = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const allRows = await fetchAllRows();
+      const csv = rowsToCsv(columns, allRows);
+      const fname = `${client.slug}-campaigns-${range.startDate}_${range.endDate}.csv`;
+      downloadCsv(fname, csv);
+    } finally {
+      setExporting(false);
+    }
+  }, [columns, client.slug, range, fetchAllRows, exporting]);
+
+  const handlePrintPdf = useCallback(async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const allRows = await fetchAllRows();
+      setPrintRows(allRows);
+      // Yield to the browser so the DOM updates before window.print().
+      await new Promise((r) => setTimeout(r, 0));
+      window.print();
+    } finally {
+      setPrintRows(null);
+      setExporting(false);
+    }
+  }, [fetchAllRows, exporting]);
+
+  // Display rows — current page in normal use, full set during print.
+  const displayRows = printRows ?? rows;
 
   return (
     <div className="cd-camp-root">
@@ -428,11 +532,21 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
         </div>
 
         <div className="cd-camp-toolbar__group cd-camp-toolbar__group--end">
-          <button type="button" className="cd-pill" onClick={handleExportCsv}>
+          <button
+            type="button"
+            className="cd-pill"
+            onClick={handleExportCsv}
+            disabled={exporting}
+          >
             <Download size={14} />
             CSV
           </button>
-          <button type="button" className="cd-pill" onClick={handlePrintPdf}>
+          <button
+            type="button"
+            className="cd-pill"
+            onClick={handlePrintPdf}
+            disabled={exporting}
+          >
             <Printer size={14} />
             PDF
           </button>
@@ -455,7 +569,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
           <div className="cd-camp-print-head cd-camp-print-only">
             <h2>{client.name} — קמפיינים</h2>
             <div>
-              {range.startDate} → {range.endDate} · {sorted.length} קמפיינים
+              {range.startDate} → {range.endDate} · {totalRows} קמפיינים
             </div>
           </div>
 
@@ -480,7 +594,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
                 </tr>
               </thead>
               <tbody>
-                {sorted.length === 0 && (
+                {displayRows.length === 0 && (
                   <tr>
                     <td
                       colSpan={columns.length + 1}
@@ -491,7 +605,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
                     </td>
                   </tr>
                 )}
-                {sorted.map((row) => {
+                {displayRows.map((row) => {
                   const expanded = expandedKey === row.key;
                   return (
                     <FragmentRow
@@ -510,7 +624,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
                   );
                 })}
               </tbody>
-              {sorted.length > 0 && (
+              {totalRows > 0 && apiTotals && (
                 <tfoot>
                   <tr className="cd-camp-totals">
                     <td aria-hidden />
@@ -519,7 +633,7 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
                         key={col.key}
                         className={col.numeric ? 'cd-num cd-mono' : ''}
                       >
-                        {totalsCell(col, totals, client.currency, sorted.length)}
+                        {totalsCell(col, apiTotals, client.currency, totalRows)}
                       </td>
                     ))}
                   </tr>
@@ -527,8 +641,88 @@ export default function CampaignsTab({ client }: CampaignsTabProps) {
               )}
             </table>
           </div>
+
+          {totalRows > 0 && (
+            <PaginationBar
+              page={page}
+              pageSize={pageSize}
+              total={totalRows}
+              onPage={setPage}
+              onPageSize={setPageSize}
+            />
+          )}
         </>
       )}
+    </div>
+  );
+}
+
+// =====================================================
+// Pagination bar
+// =====================================================
+
+function PaginationBar({
+  page,
+  pageSize,
+  total,
+  onPage,
+  onPageSize,
+}: {
+  page: number;
+  pageSize: number;
+  total: number;
+  onPage: (p: number) => void;
+  onPageSize: (n: number) => void;
+}) {
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const from = total === 0 ? 0 : (safePage - 1) * pageSize + 1;
+  const to = Math.min(total, safePage * pageSize);
+  // Hebrew is RTL — visually the "previous" arrow points right and "next"
+  // points left. Lucide icon names refer to LTR direction, so we swap them
+  // here so the visual matches the action.
+  return (
+    <div className="cd-camp-pagination cd-camp-no-print">
+      <div className="cd-camp-pagination__info">
+        מציג {from}–{to} מתוך {total}
+      </div>
+      <div className="cd-camp-pagination__controls">
+        <label className="cd-camp-pagination__page-size">
+          שורות בעמוד
+          <select
+            className="cd-input"
+            value={pageSize}
+            onChange={(e) => onPageSize(Number(e.target.value))}
+          >
+            {PAGE_SIZE_OPTIONS.map((n) => (
+              <option key={n} value={n}>
+                {n}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button
+          type="button"
+          className="cd-pill"
+          onClick={() => onPage(Math.max(1, safePage - 1))}
+          disabled={safePage <= 1}
+        >
+          <ChevronRight size={14} />
+          הקודם
+        </button>
+        <span className="cd-camp-pagination__page">
+          {safePage} / {totalPages}
+        </span>
+        <button
+          type="button"
+          className="cd-pill"
+          onClick={() => onPage(Math.min(totalPages, safePage + 1))}
+          disabled={safePage >= totalPages}
+        >
+          הבא
+          <ChevronLeft size={14} />
+        </button>
+      </div>
     </div>
   );
 }
@@ -627,44 +821,14 @@ function SortIcon({ active, dir }: { active: boolean; dir: SortDir }) {
 }
 
 // =====================================================
-// Sorting + totals
+// Totals
 // =====================================================
+// Sort + filter + per-page aggregation now happen on the server (see
+// src/app/api/clients-dashboard/campaigns/route.ts). The totals shape we
+// receive in the API response is structurally compatible with the row footer
+// formatter below.
 
-function compareRows(a: CampaignRow, b: CampaignRow, key: SortKey, dir: SortDir): number {
-  const av = a[key as keyof CampaignRow];
-  const bv = b[key as keyof CampaignRow];
-  let cmp = 0;
-  if (av == null && bv == null) cmp = 0;
-  else if (av == null) cmp = 1; // nulls last
-  else if (bv == null) cmp = -1;
-  else if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv;
-  else cmp = String(av).localeCompare(String(bv), 'he');
-  return dir === 'asc' ? cmp : -cmp;
-}
-
-interface Totals {
-  spend: number;
-  impressions: number;
-  clicks: number;
-  conversions: number;
-  revenue: number;
-}
-
-function aggregateTotals(rows: CampaignRow[]): Totals {
-  return rows.reduce<Totals>(
-    (acc, r) => {
-      acc.spend += r.spend;
-      acc.impressions += r.impressions;
-      acc.clicks += r.clicks;
-      acc.conversions += r.conversions;
-      acc.revenue += r.revenue;
-      return acc;
-    },
-    { spend: 0, impressions: 0, clicks: 0, conversions: 0, revenue: 0 },
-  );
-}
-
-function totalsCell(col: Column, t: Totals, currency: string, count: number): string {
+function totalsCell(col: Column, t: CampaignsTotals, currency: string, count: number): string {
   switch (col.key) {
     case 'name':
       return `סה"כ ${count}`;
@@ -710,6 +874,66 @@ function readRangeFromUrl(): { startDate: string; endDate: string } {
   return {
     startDate: valid(s) ? (s as string) : fallback.startDate,
     endDate: valid(e) ? (e as string) : fallback.endDate,
+  };
+}
+
+interface UrlState {
+  q: string;
+  platform: PlatformFilter;
+  sortKey: SortKey;
+  sortDir: SortDir;
+  page: number;
+  pageSize: number;
+}
+
+function readUrlState(): UrlState {
+  const fallback: UrlState = {
+    q: '',
+    platform: 'all',
+    sortKey: 'spend',
+    sortDir: 'desc',
+    page: 1,
+    pageSize: DEFAULT_PAGE_SIZE,
+  };
+  if (typeof window === 'undefined') return fallback;
+  const params = new URLSearchParams(window.location.search);
+  const platformRaw = params.get('platform');
+  const platform: PlatformFilter =
+    platformRaw === 'meta' || platformRaw === 'google' || platformRaw === 'ga4'
+      ? platformRaw
+      : 'all';
+  const sortKeyRaw = params.get('sortKey');
+  const validSortKeys: SortKey[] = [
+    'name',
+    'platform',
+    'status',
+    'spend',
+    'impressions',
+    'clicks',
+    'conversions',
+    'revenue',
+    'ctr',
+    'cpc',
+    'cpl',
+    'roas',
+  ];
+  const sortKey: SortKey = validSortKeys.includes(sortKeyRaw as SortKey)
+    ? (sortKeyRaw as SortKey)
+    : 'spend';
+  const sortDir: SortDir = params.get('sortDir') === 'asc' ? 'asc' : 'desc';
+  const pageRaw = Number(params.get('page') ?? 1);
+  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+  const pageSizeRaw = Number(params.get('pageSize') ?? DEFAULT_PAGE_SIZE);
+  const pageSize = (PAGE_SIZE_OPTIONS as ReadonlyArray<number>).includes(pageSizeRaw)
+    ? pageSizeRaw
+    : DEFAULT_PAGE_SIZE;
+  return {
+    q: params.get('q') ?? '',
+    platform,
+    sortKey,
+    sortDir,
+    page,
+    pageSize,
   };
 }
 

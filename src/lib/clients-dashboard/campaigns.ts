@@ -38,9 +38,28 @@ export interface CampaignDailyPoint {
   impressions: number;
 }
 
+export interface CampaignsTotals {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  count: number;
+}
+
 export interface CampaignsApiResponse {
   campaigns: CampaignRow[];
   range: { startDate: string; endDate: string };
+  // Pagination metadata. `total` is the deduped campaign count over the date
+  // range (after aggregation), not the raw daily-row count. When the request
+  // is the single-campaign drill-down (campaignKey present), pagination is
+  // skipped and these fields reflect the drill-down result.
+  total: number;
+  page: number;
+  pageSize: number;
+  // Aggregated metrics across ALL campaigns in the range (not just the
+  // current page) so the totals footer stays correct under pagination.
+  totals?: CampaignsTotals;
   // When clientId+campaignKey are both passed, the API returns the daily
   // breakdown for that single campaign. Otherwise this is undefined.
   daily?: CampaignDailyPoint[];
