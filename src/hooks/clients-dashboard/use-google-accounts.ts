@@ -20,7 +20,7 @@ const fetcher = async (url: string): Promise<GoogleAccountsResponse> => {
 };
 
 export function useGoogleAccounts() {
-  const { data, error, isLoading } = useSWR('/api/ads-hub/google/accounts', fetcher, {
+  const { data, error, isLoading } = useSWR('/api/clients-dashboard/google/accounts', fetcher, {
     revalidateOnFocus: false,
     dedupingInterval: 3600000,
     revalidateIfStale: false,

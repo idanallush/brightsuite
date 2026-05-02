@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useLastRouteStore } from '@/stores/last-route';
 
 /** Tool base paths that we track — longer paths first to avoid prefix collisions */
-const TOOL_BASES = ['/ads-hub', '/ad-checker', '/ads', '/budget', '/cpa', '/writer', '/settings'];
+const TOOL_BASES = ['/clients-dashboard', '/ad-checker', '/ads', '/budget', '/cpa', '/writer', '/settings'];
 
 /**
  * Tracks the current route and saves it as the "last visited" route for the tool.

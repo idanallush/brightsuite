@@ -6,7 +6,6 @@ export type ToolSlug =
   | 'cpa'
   | 'ads'
   | 'writer'
-  | 'ads-hub'
   | 'ppc-retainer'
   | 'clients-dashboard';
 

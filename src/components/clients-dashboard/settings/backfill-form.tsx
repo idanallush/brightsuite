@@ -1,14 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import useSWR from 'swr';
 import { Download } from 'lucide-react';
-import { useOverview } from '@/hooks/ads-hub/use-overview';
-import { useDashboardStore } from '@/stores/ads-hub/dashboard-store';
 import { toast } from 'sonner';
 
+interface RawClientsResponse {
+  clients: Record<string, unknown>[];
+}
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
 export const BackfillForm = () => {
-  const { startDate: dsStart, endDate: dsEnd } = useDashboardStore();
-  const { data } = useOverview(dsStart, dsEnd);
+  const { data } = useSWR<RawClientsResponse>('/api/clients-dashboard/clients?raw=1', fetcher);
   const clients = data?.clients || [];
 
   const [clientId, setClientId] = useState('');
@@ -25,7 +29,7 @@ export const BackfillForm = () => {
 
     setLoading(true);
     try {
-      const res = await fetch('/api/ads-hub/sync/backfill', {
+      const res = await fetch('/api/clients-dashboard/sync/backfill', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -40,7 +44,7 @@ export const BackfillForm = () => {
       if (res.ok) {
         const totalRecords = data.results?.reduce(
           (sum: number, r: { recordsSynced: number }) => sum + r.recordsSynced,
-          0
+          0,
         ) || 0;
         toast.success(`Backfill הושלם: ${totalRecords} רשומות`);
       } else {
@@ -65,7 +69,7 @@ export const BackfillForm = () => {
             style={{ background: 'var(--glass-bg)', borderColor: 'var(--glass-border)', color: 'var(--text-primary)' }}
           >
             <option value="">בחירת לקוח</option>
-            {clients.map((c: Record<string, unknown>) => (
+            {clients.map((c) => (
               <option key={c.id as number} value={c.id as number}>{c.name as string}</option>
             ))}
           </select>

@@ -3,7 +3,7 @@ import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { runBackfill } from '@/lib/ads-hub/sync-orchestrator';
 import type { Platform } from '@/lib/ads-hub/types';
 
-// POST /api/ads-hub/sync/backfill — trigger historical backfill
+// POST /api/clients-dashboard/sync/backfill — trigger historical backfill
 export async function POST(request: NextRequest) {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (!clientId || !platform || !startDate || !endDate) {
     return NextResponse.json(
       { error: 'clientId, platform, startDate, and endDate are required' },
-      { status: 400 }
+      { status: 400 },
     );
   }
 

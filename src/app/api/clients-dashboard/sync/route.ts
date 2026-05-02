@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { runDailySync } from '@/lib/ads-hub/sync-orchestrator';
 
-// POST /api/ads-hub/sync — trigger manual sync for all clients
+// POST /api/clients-dashboard/sync — trigger manual sync for all clients
 export async function POST(_request: NextRequest) {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;

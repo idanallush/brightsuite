@@ -30,7 +30,6 @@ export async function GET() {
   try {
     const accessToken = await getGoogleAdsAccessToken();
 
-    // Query all customer clients under the MCC
     const url = `https://googleads.googleapis.com/${GOOGLE_ADS_API_VERSION}/customers/${mccId}/googleAds:searchStream`;
 
     const res = await fetch(url, {
@@ -85,7 +84,7 @@ export async function GET() {
     console.error('[Google Ads] Error fetching accounts:', err);
     return NextResponse.json(
       { error: (err as Error).message },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

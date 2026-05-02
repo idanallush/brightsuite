@@ -450,7 +450,6 @@ export default function SystemPage() {
 │   │   ├── (tools)/
 │   │   │   ├── ad-checker/          Ad Safe Zone
 │   │   │   ├── ads/                 FB Ads Tool
-│   │   │   ├── ads-hub/             Ads Hub (legacy)
 │   │   │   ├── budget/              BudgetFlow
 │   │   │   ├── clients-dashboard/   Clients Dashboard
 │   │   │   ├── cpa/                 CPA Tracker

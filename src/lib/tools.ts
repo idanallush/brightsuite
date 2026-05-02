@@ -59,14 +59,6 @@ export const TOOLS: ToolDefinition[] = [
     color: '#0ea5e9',
   },
   {
-    slug: 'ads-hub',
-    name: 'Ads Hub',
-    description: 'דשבורד מאוחד לנתוני פרסום מכל הפלטפורמות (legacy)',
-    icon: 'BarChart3',
-    href: '/ads-hub',
-    color: '#3b82f6',
-  },
-  {
     slug: 'ppc-retainer',
     name: 'ניהול ריטיינרים',
     description: 'תיק לקוחות PPC, רווחיות צוות, הוצאות ותחזית 12 חודשים',

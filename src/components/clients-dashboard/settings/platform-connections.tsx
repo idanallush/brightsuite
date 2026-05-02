@@ -63,31 +63,31 @@ export const PlatformConnections = () => {
 
   const { data: fbStatus, isLoading: fbLoading, mutate: mutateFb } = useSWR<FbStatusResponse>(
     '/api/account/facebook/status',
-    fetcher
+    fetcher,
   );
   const { data: googleStatus, isLoading: googleLoading, mutate: mutateGoogle } = useSWR<GoogleStatusResponse>(
     '/api/ads-hub/auth/google/status',
-    fetcher
+    fetcher,
   );
   const { data: platformData, isLoading: platformLoading } = useSWR<PlatformSettingsResponse>(
-    '/api/ads-hub/settings',
-    fetcher
+    '/api/clients-dashboard/settings',
+    fetcher,
   );
 
   const [disconnectingFb, setDisconnectingFb] = useState(false);
   const [disconnectingGoogle, setDisconnectingGoogle] = useState(false);
 
-  // Handle OAuth redirect feedback
+  // OAuth callback redirects back here with ?google_connected=1 / ?google_error=…
   useEffect(() => {
     const googleConnected = searchParams.get('google_connected');
     const googleError = searchParams.get('google_error');
     if (googleConnected) {
       toast.success('Google מחובר בהצלחה');
       mutateGoogle();
-      window.history.replaceState({}, '', '/ads-hub/settings');
+      window.history.replaceState({}, '', '/clients-dashboard/settings');
     } else if (googleError) {
       toast.error(`שגיאה בחיבור Google: ${googleError}`);
-      window.history.replaceState({}, '', '/ads-hub/settings');
+      window.history.replaceState({}, '', '/clients-dashboard/settings');
     }
   }, [searchParams, mutateGoogle]);
 
@@ -143,7 +143,6 @@ export const PlatformConnections = () => {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {/* Meta / Facebook */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">
@@ -205,7 +204,6 @@ export const PlatformConnections = () => {
         </CardContent>
       </Card>
 
-      {/* Google (Ads + Analytics combined) */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-sm">

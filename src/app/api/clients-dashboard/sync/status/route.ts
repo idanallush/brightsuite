@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireApiAuth } from '@/lib/auth/require-auth-api';
 import { getTurso } from '@/lib/db/turso';
 
-// GET /api/ads-hub/sync/status — sync log entries
+// GET /api/clients-dashboard/sync/status — sync log entries
 export async function GET(request: NextRequest) {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;

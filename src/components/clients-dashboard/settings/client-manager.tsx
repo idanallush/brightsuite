@@ -3,18 +3,20 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Plus, RefreshCw, ChevronDown, Loader2, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react';
-import { useOverview } from '@/hooks/ads-hub/use-overview';
-import { useFacebookAccounts } from '@/hooks/ads-hub/use-facebook-accounts';
-import { useGoogleAccounts } from '@/hooks/ads-hub/use-google-accounts';
+import { useFacebookAccounts } from '@/hooks/clients-dashboard/use-facebook-accounts';
+import { useGoogleAccounts } from '@/hooks/clients-dashboard/use-google-accounts';
 import { toast } from 'sonner';
-import { useDashboardStore } from '@/stores/ads-hub/dashboard-store';
 
 interface SessionResponse {
   authenticated: boolean;
   user?: { role: 'admin' | 'manager' | 'viewer' };
 }
 
-const sessionFetcher = (url: string) => fetch(url).then((r) => r.json());
+interface RawClientsResponse {
+  clients: Record<string, unknown>[];
+}
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 interface ClientFormData {
   name: string;
@@ -37,11 +39,10 @@ const emptyForm: ClientFormData = {
 };
 
 export const ClientManager = () => {
-  const { startDate, endDate } = useDashboardStore();
-  const { data, mutate } = useOverview(startDate, endDate);
+  const { data, mutate } = useSWR<RawClientsResponse>('/api/clients-dashboard/clients?raw=1', fetcher);
   const clients = data?.clients || [];
 
-  const { data: sessionData } = useSWR<SessionResponse>('/api/auth/session', sessionFetcher, {
+  const { data: sessionData } = useSWR<SessionResponse>('/api/auth/session', fetcher, {
     revalidateOnMount: true,
     revalidateOnFocus: true,
   });
@@ -63,7 +64,7 @@ export const ClientManager = () => {
     }
 
     try {
-      const res = await fetch('/api/ads-hub/clients', {
+      const res = await fetch('/api/clients-dashboard/clients', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -105,7 +106,7 @@ export const ClientManager = () => {
     }
 
     try {
-      const res = await fetch(`/api/ads-hub/clients/${editingId}`, {
+      const res = await fetch(`/api/clients-dashboard/clients/${editingId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -128,7 +129,7 @@ export const ClientManager = () => {
 
   const handleDelete = async (clientId: number) => {
     try {
-      const res = await fetch(`/api/ads-hub/clients/${clientId}`, {
+      const res = await fetch(`/api/clients-dashboard/clients/${clientId}`, {
         method: 'DELETE',
       });
 
@@ -149,12 +150,12 @@ export const ClientManager = () => {
   const handleManualSync = async () => {
     setSyncing(true);
     try {
-      const res = await fetch('/api/ads-hub/sync', { method: 'POST' });
+      const res = await fetch('/api/clients-dashboard/sync', { method: 'POST' });
       const data = await res.json();
       if (res.ok) {
         const errors = data.results?.flatMap(
           (r: { syncs: Array<{ status: string; error?: string; platform: string }> }) =>
-            r.syncs.filter((s) => s.status === 'error').map((s) => `${s.platform}: ${s.error}`)
+            r.syncs.filter((s) => s.status === 'error').map((s) => `${s.platform}: ${s.error}`),
         ) || [];
 
         if (errors.length > 0) {
@@ -188,10 +189,10 @@ export const ClientManager = () => {
   };
 
   const usedMetaIds = new Set(
-    clients.map((c: Record<string, unknown>) => c.meta_account_id as string).filter(Boolean)
+    clients.map((c) => c.meta_account_id as string).filter(Boolean),
   );
   const usedGoogleIds = new Set(
-    clients.map((c: Record<string, unknown>) => c.google_customer_id as string).filter(Boolean)
+    clients.map((c) => c.google_customer_id as string).filter(Boolean),
   );
 
   const renderAccountFields = (isEdit = false) => (
@@ -222,7 +223,6 @@ export const ClientManager = () => {
         </div>
       )}
 
-      {/* Meta Account */}
       <div>
         <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
           חשבון Meta
@@ -264,7 +264,6 @@ export const ClientManager = () => {
         )}
       </div>
 
-      {/* Google Customer */}
       <div>
         <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>
           חשבון Google Ads
@@ -312,7 +311,6 @@ export const ClientManager = () => {
         )}
       </div>
 
-      {/* Google MCC — only when no dropdown */}
       {googleAccounts.length === 0 && (
         <div>
           <label className="text-xs font-medium block mb-1" style={{ color: 'var(--text-secondary)' }}>Google MCC ID</label>
@@ -379,7 +377,6 @@ export const ClientManager = () => {
 
   return (
     <div className="space-y-4">
-      {/* Role warning for non-admins */}
       {sessionData && !isAdmin && (
         <div
           className="flex items-start gap-2 rounded-lg p-3 text-xs"
@@ -396,7 +393,6 @@ export const ClientManager = () => {
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex gap-2">
         <button
           onClick={() => {
@@ -425,7 +421,6 @@ export const ClientManager = () => {
         </button>
       </div>
 
-      {/* Add Client Form */}
       {showForm && (
         <div className="glass-card rounded-xl p-5 space-y-4">
           <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>לקוח חדש</h4>
@@ -451,7 +446,6 @@ export const ClientManager = () => {
         </div>
       )}
 
-      {/* Edit Client Form */}
       {editingId && (
         <div className="glass-card rounded-xl p-5 space-y-4" style={{ borderColor: 'var(--accent)', borderWidth: '1px' }}>
           <h4 className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
@@ -479,7 +473,6 @@ export const ClientManager = () => {
         </div>
       )}
 
-      {/* Client List */}
       {clients.length > 0 && (
         <div className="glass-card rounded-xl overflow-hidden">
           <table className="w-full text-sm">
@@ -493,7 +486,7 @@ export const ClientManager = () => {
               </tr>
             </thead>
             <tbody>
-              {clients.map((c: Record<string, unknown>) => {
+              {clients.map((c) => {
                 const clientId = c.id as number;
                 const metaName = fbAccounts.find((a) => a.account_id === c.meta_account_id)?.name;
                 const googleName = googleAccounts.find((a) => a.id === c.google_customer_id)?.name;

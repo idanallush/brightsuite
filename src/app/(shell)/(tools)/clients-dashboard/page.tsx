@@ -4,7 +4,7 @@ import './styles.css';
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
-import { Search, AlertTriangle } from 'lucide-react';
+import { Search, AlertTriangle, Settings } from 'lucide-react';
 import type { ClientSummary, MetricType } from '@/lib/clients-dashboard/types';
 
 type ApiResponse = {
@@ -100,6 +100,14 @@ export default function ClientsDashboardPage() {
               </button>
             ))}
           </div>
+          <Link
+            href="/clients-dashboard/settings"
+            className="cd-pill"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}
+          >
+            <Settings size={13} />
+            הגדרות
+          </Link>
         </div>
       </div>
 

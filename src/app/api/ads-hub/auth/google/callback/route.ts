@@ -39,11 +39,11 @@ export async function GET(request: NextRequest) {
   const error = searchParams.get('error');
 
   if (error) {
-    return NextResponse.redirect(`${BASE_URL}/ads-hub/settings?google_error=${error}`);
+    return NextResponse.redirect(`${BASE_URL}/clients-dashboard/settings?google_error=${error}`);
   }
 
   if (!code) {
-    return NextResponse.redirect(`${BASE_URL}/ads-hub/settings?google_error=no_code`);
+    return NextResponse.redirect(`${BASE_URL}/clients-dashboard/settings?google_error=no_code`);
   }
 
   const session = await getServerSession();
@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
   }
 
   if (!state || state !== session.csrfState) {
-    return NextResponse.redirect(`${BASE_URL}/ads-hub/settings?google_error=invalid_state`);
+    return NextResponse.redirect(`${BASE_URL}/clients-dashboard/settings?google_error=invalid_state`);
   }
 
   try {
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
     if (!tokenData.refresh_token) {
       // Happens if the user previously authorized and Google didn't return a
       // new refresh token. We forced `prompt=consent` so this is rare.
-      return NextResponse.redirect(`${BASE_URL}/ads-hub/settings?google_error=no_refresh_token`);
+      return NextResponse.redirect(`${BASE_URL}/clients-dashboard/settings?google_error=no_refresh_token`);
     }
 
     let googleUserId: string | null = null;
@@ -106,11 +106,11 @@ export async function GET(request: NextRequest) {
     session.csrfState = undefined;
     await session.save();
 
-    return NextResponse.redirect(`${BASE_URL}/ads-hub/settings?google_connected=1`);
+    return NextResponse.redirect(`${BASE_URL}/clients-dashboard/settings?google_connected=1`);
   } catch (err) {
     console.error('Google OAuth callback error:', err);
     return NextResponse.redirect(
-      `${BASE_URL}/ads-hub/settings?google_error=${encodeURIComponent(
+      `${BASE_URL}/clients-dashboard/settings?google_error=${encodeURIComponent(
         err instanceof Error ? err.message : 'unknown'
       )}`
     );

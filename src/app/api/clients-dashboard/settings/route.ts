@@ -18,7 +18,7 @@ interface PlatformQueryResult {
 // sync exists — so stale failures don't stick around after recovery.
 async function getPlatformQueryResult(
   platform: Platform,
-  accountField: string
+  accountField: string,
 ): Promise<PlatformQueryResult> {
   const db = getTurso();
 
@@ -39,7 +39,6 @@ async function getPlatformQueryResult(
   const errorStartedAt = (lastErrorResult.rows[0]?.started_at as string) || null;
   const errorMessage = (lastErrorResult.rows[0]?.error_message as string) || null;
 
-  // Only surface the error if it's newer than the last successful sync.
   const lastError =
     errorMessage && (!lastSync || (errorStartedAt && errorStartedAt > lastSync))
       ? errorMessage
@@ -55,7 +54,7 @@ async function getPlatformQueryResult(
   return { lastSync, accountCount, lastError };
 }
 
-// GET /api/ads-hub/settings — connection status per platform
+// GET /api/clients-dashboard/settings — connection status per platform
 export async function GET() {
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;

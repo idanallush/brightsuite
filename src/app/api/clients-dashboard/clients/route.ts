@@ -6,11 +6,16 @@ import type { ClientSummary } from '@/lib/clients-dashboard/types';
 // GET /api/clients-dashboard/clients?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
 // Returns each active client with its KPIs aggregated over the date range,
 // connection flags, and open-alert count. Drives the list page.
+//
+// `?raw=1` returns the underlying ah_clients rows untransformed — used by the
+// settings client manager which needs the raw account IDs to populate the form.
 export async function GET(request: NextRequest) {
+  const search = request.nextUrl.searchParams;
+  if (search.get('raw') === '1') return getRawClients();
+
   const auth = await requireApiAuth();
   if (auth.error) return auth.error;
 
-  const search = request.nextUrl.searchParams;
   const startDate = search.get('startDate') || getMonthStart();
   const endDate = search.get('endDate') || getToday();
 
@@ -98,6 +103,62 @@ export async function GET(request: NextRequest) {
   });
 
   return NextResponse.json({ clients, range: { startDate, endDate } });
+}
+
+// Raw client rows — used by the settings client manager which needs the
+// underlying ah_clients fields (meta_account_id, google_customer_id, etc.).
+async function getRawClients() {
+  const auth = await requireApiAuth();
+  if (auth.error) return auth.error;
+
+  const db = getTurso();
+  const result = await db.execute({
+    sql: `SELECT * FROM ah_clients WHERE is_active = 1 ORDER BY name ASC`,
+    args: [],
+  });
+  return NextResponse.json({ clients: result.rows });
+}
+
+// POST /api/clients-dashboard/clients — create a new client
+export async function POST(request: NextRequest) {
+  const auth = await requireApiAuth();
+  if (auth.error) return auth.error;
+  if (auth.session.role !== 'admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
+  const body = await request.json();
+  const { name, slug, metaAccountId, googleCustomerId, googleMccId, ga4PropertyId, currency, metricType } = body;
+
+  if (!name || !slug) {
+    return NextResponse.json({ error: 'Name and slug are required' }, { status: 400 });
+  }
+
+  const db = getTurso();
+
+  try {
+    const result = await db.execute({
+      sql: `INSERT INTO ah_clients (name, slug, meta_account_id, google_customer_id, google_mcc_id, ga4_property_id, currency, metric_type)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+      args: [
+        name,
+        slug,
+        metaAccountId || null,
+        googleCustomerId?.replace(/-/g, '') || null,
+        googleMccId?.replace(/-/g, '') || null,
+        ga4PropertyId || null,
+        currency || 'ILS',
+        metricType === 'ecommerce' ? 'ecommerce' : 'leads',
+      ],
+    });
+
+    return NextResponse.json({ client: result.rows[0] }, { status: 201 });
+  } catch (err) {
+    if ((err as Error).message.includes('UNIQUE')) {
+      return NextResponse.json({ error: 'Client slug already exists' }, { status: 409 });
+    }
+    throw err;
+  }
 }
 
 function getMonthStart(): string {

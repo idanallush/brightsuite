@@ -29,7 +29,6 @@ const DEMO_TOOLS: ToolSlug[] = [
   'cpa',
   'ads',
   'writer',
-  'ads-hub',
   'ppc-retainer',
   'clients-dashboard',
 ];
