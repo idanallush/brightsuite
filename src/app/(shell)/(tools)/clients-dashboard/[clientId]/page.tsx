@@ -1,7 +1,7 @@
 'use client';
 
 import '../styles.css';
-import { useMemo, useState, use } from 'react';
+import { useState, use } from 'react';
 import Link from 'next/link';
 import useSWR from 'swr';
 import { ChevronRight, BarChart3, Image as ImageIcon, History, Bell, LayoutGrid } from 'lucide-react';
@@ -14,7 +14,7 @@ import ViewsTab from '@/components/clients-dashboard/views/views-tab';
 import { useAuth } from '@/hooks/use-auth';
 
 type ApiResponse = {
-  clients: ClientSummary[];
+  client: ClientSummary;
   range: { startDate: string; endDate: string };
 };
 
@@ -68,14 +68,12 @@ export default function ClientDetailPage({
   const startDate = isoDaysAgo(30);
   const endDate = isoToday();
 
-  // For now, fetch all clients and find this one. Once Agent A ships the
-  // per-client API, swap to /api/clients-dashboard/clients/:id.
   const { data, error, isLoading, mutate } = useSWR<ApiResponse>(
-    `/api/clients-dashboard/clients?startDate=${startDate}&endDate=${endDate}`,
+    `/api/clients-dashboard/clients/${id}?startDate=${startDate}&endDate=${endDate}`,
     fetcher,
   );
 
-  const client = useMemo(() => data?.clients.find((c) => c.id === id) ?? null, [data, id]);
+  const client = data?.client ?? null;
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
 
@@ -87,16 +85,10 @@ export default function ClientDetailPage({
     if (!client || client.metricType === next || savingType) return;
     setSavingType(true);
     setTypeError(null);
-    // Optimistic update: patch the cached list immediately.
     mutate(
       (current) =>
         current
-          ? {
-              ...current,
-              clients: current.clients.map((c) =>
-                c.id === client.id ? { ...c, metricType: next } : c,
-              ),
-            }
+          ? { ...current, client: { ...current.client, metricType: next } }
           : current,
       { revalidate: false },
     );
