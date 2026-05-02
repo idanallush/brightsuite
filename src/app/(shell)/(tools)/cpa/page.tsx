@@ -91,8 +91,9 @@ function DashboardContent() {
     try {
       await mutate();
       toast.success("הנתונים עודכנו");
-    } catch {
-      toast.error("שגיאה ברענון הנתונים");
+    } catch (err) {
+      console.error("[cpa] refresh failed:", err);
+      toast.error(err instanceof Error ? err.message : "שגיאה ברענון הנתונים");
     } finally {
       setIsRefreshing(false);
     }

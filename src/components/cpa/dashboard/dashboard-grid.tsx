@@ -38,7 +38,8 @@ function getHiddenCards(): Set<string> {
   try {
     const stored = localStorage.getItem("cpa-hidden-cards");
     return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
+  } catch (err) {
+    console.warn("[cpa] failed to parse cpa-hidden-cards from localStorage:", err);
     return new Set();
   }
 }
@@ -51,7 +52,8 @@ function getCollapsedCards(): Set<string> {
   try {
     const stored = localStorage.getItem("cpa-collapsed-cards");
     return stored ? new Set(JSON.parse(stored)) : new Set();
-  } catch {
+  } catch (err) {
+    console.warn("[cpa] failed to parse cpa-collapsed-cards from localStorage:", err);
     return new Set();
   }
 }

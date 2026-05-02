@@ -31,12 +31,21 @@ interface RecentAlertsResponse {
 
 function getLastSeenAt(): string | null {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem(STORAGE_KEY);
+  try {
+    return localStorage.getItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn(`[cpa] failed to read ${STORAGE_KEY} from localStorage:`, err);
+    return null;
+  }
 }
 
 function setLastSeenAt(timestamp: string): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, timestamp);
+  try {
+    localStorage.setItem(STORAGE_KEY, timestamp);
+  } catch (err) {
+    console.warn(`[cpa] failed to write ${STORAGE_KEY} to localStorage:`, err);
+  }
 }
 
 function formatRelativeTime(isoDate: string): string {
