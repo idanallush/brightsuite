@@ -10,6 +10,7 @@ import type {
   AlertStatus,
   ClientSummary,
 } from '@/lib/clients-dashboard/types';
+import { resolveAlertKind } from '@/lib/clients-dashboard/alert-kinds';
 
 interface AlertsTabProps {
   client: ClientSummary;
@@ -168,6 +169,8 @@ function AlertCard({ alert, currency, pending, onPatch }: AlertCardProps) {
     void onPatch(alert.id, status);
   };
 
+  const kindMeta = resolveAlertKind(alert.kind);
+
   return (
     <div className={`cd-alert-card cd-alert-card--${alert.severity}`}>
       <div className="cd-alert-card__icon">
@@ -176,6 +179,12 @@ function AlertCard({ alert, currency, pending, onPatch }: AlertCardProps) {
       <div className="cd-alert-card__body">
         <div className="cd-alert-card__head">
           <h4 className="cd-alert-card__title">{alert.title}</h4>
+          <span
+            className="cd-alert-card__kind"
+            title={kindMeta.description || undefined}
+          >
+            {kindMeta.label}
+          </span>
           <span className={`cd-alert-card__sev cd-alert-card__sev--${alert.severity}`}>
             {SEVERITY_LABEL[alert.severity]}
           </span>
@@ -189,6 +198,14 @@ function AlertCard({ alert, currency, pending, onPatch }: AlertCardProps) {
         />
         <div className="cd-alert-card__meta">
           <span>{formatDate(alert.createdAt)}</span>
+          {alert.reopenedCount > 0 && (
+            <span
+              className="cd-alert-card__reopened"
+              title="ההתראה אושרה בעבר אך זוהתה שוב מאז"
+            >
+              · נפתחה מחדש ×{alert.reopenedCount}
+            </span>
+          )}
           {alert.platform && <span>· {alert.platform}</span>}
           {alert.status !== 'open' && (
             <span>· {STATUS_LABEL[alert.status]}</span>

@@ -1258,6 +1258,22 @@
   letter-spacing: 0.04em;
 }
 
+.cd-alert-card__kind {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  cursor: help;
+}
+
+.cd-alert-card__reopened {
+  font-weight: 600;
+  color: var(--warning-text, var(--text-secondary));
+}
+
 .cd-alert-card__sev--critical {
   background: var(--danger-subtle);
   color: var(--danger-text);

@@ -71,6 +71,7 @@ export interface AlertRecord {
   acknowledgedBy: number | null;
   acknowledgedAt: string | null;
   resolvedAt: string | null;
+  reopenedCount: number;
   createdAt: string;
 }
 

@@ -286,6 +286,7 @@ export async function initDatabase(): Promise<void> {
       acknowledged_by INTEGER REFERENCES bs_users(id) ON DELETE SET NULL,
       acknowledged_at TEXT,
       resolved_at TEXT,
+      reopened_count INTEGER NOT NULL DEFAULT 0,
       created_at TEXT DEFAULT (datetime('now'))
     );
 
@@ -406,6 +407,21 @@ export async function initDatabase(): Promise<void> {
       args: [],
     });
     console.log('[DB] Added roas column to ah_performance_daily');
+  }
+
+  // Migration: add reopened_count to cd_alerts so we can track how many times
+  // the same (client_id, kind) re-opened after being acknowledged.
+  const alertsCols = await db.execute({
+    sql: `PRAGMA table_info(cd_alerts)`,
+    args: [],
+  });
+  const alertsColNames = new Set(alertsCols.rows.map((r) => r.name as string));
+  if (!alertsColNames.has('reopened_count')) {
+    await db.execute({
+      sql: `ALTER TABLE cd_alerts ADD COLUMN reopened_count INTEGER NOT NULL DEFAULT 0`,
+      args: [],
+    });
+    console.log('[DB] Added reopened_count column to cd_alerts');
   }
 
   // Bootstrap: if no admin exists yet, promote the earliest active user to admin.

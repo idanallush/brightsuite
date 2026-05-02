@@ -3,8 +3,9 @@
 // Pure functions that read from `ah_*` tables and write to `cd_alerts` /
 // `cd_campaign_changes`. Each detector run is idempotent: existing open
 // alerts with the same (client_id, campaign_id, kind) tuple are NOT
-// duplicated, and open alerts that no longer match the threshold are
-// auto-resolved.
+// duplicated, open alerts that no longer match the threshold are
+// auto-resolved, and acknowledged alerts that re-trigger are re-opened
+// in place (preserving the original created_at and bumping reopened_count).
 //
 // Detectors implemented:
 //   - spend_spike     (warning):  yesterday's spend > 2× rolling 14-day avg
@@ -561,6 +562,15 @@ async function reconcileAlerts(
   type OpenRow = { id: number; campaign_id: number | null; kind: string };
   const openRows = openResult.rows as unknown as OpenRow[];
 
+  // Existing acknowledged alerts — these can be re-opened if the underlying
+  // problem persists (or recurs). Keyed by (campaign_id, kind) just like opens.
+  const ackResult = await db.execute({
+    sql: `SELECT id, campaign_id, kind FROM cd_alerts WHERE client_id = ? AND status = 'acknowledged'`,
+    args: [clientId],
+  });
+  type AckRow = { id: number; campaign_id: number | null; kind: string };
+  const ackRows = ackResult.rows as unknown as AckRow[];
+
   const dedupeKey = (campaignId: number | null, kind: string) =>
     `${campaignId ?? 'null'}|${kind}`;
 
@@ -568,15 +578,42 @@ async function reconcileAlerts(
   for (const row of openRows) {
     openMap.set(dedupeKey(row.campaign_id, row.kind), row);
   }
+  const ackMap = new Map<string, AckRow>();
+  for (const row of ackRows) {
+    ackMap.set(dedupeKey(row.campaign_id, row.kind), row);
+  }
   const pendingKeys = new Set(pending.map((p) => dedupeKey(p.campaignId, p.kind)));
 
   let opened = 0;
   let resolved = 0;
 
-  // Insert new pending alerts that don't already have an open match.
+  // For each pending detection: if there's already an open row, skip.
+  // Otherwise, if there's an acknowledged row with the same (campaign_id, kind),
+  // re-open it in place (preserving created_at) and bump reopened_count.
+  // Otherwise, insert a brand-new open row.
   for (const p of pending) {
     const key = dedupeKey(p.campaignId, p.kind);
     if (openMap.has(key)) continue;
+
+    const existingAck = ackMap.get(key);
+    if (existingAck) {
+      await db.execute({
+        sql: `UPDATE cd_alerts
+              SET status = 'open',
+                  acknowledged_by = NULL,
+                  acknowledged_at = NULL,
+                  resolved_at = NULL,
+                  metric_value = ?,
+                  threshold_value = ?,
+                  detail = ?,
+                  reopened_count = COALESCE(reopened_count, 0) + 1
+              WHERE id = ?`,
+        args: [p.metricValue, p.thresholdValue, p.detail, existingAck.id],
+      });
+      opened += 1;
+      continue;
+    }
+
     await db.execute({
       sql: `INSERT INTO cd_alerts
             (client_id, campaign_id, platform, severity, kind, title, detail, metric_value, threshold_value, status, created_at)

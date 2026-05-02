@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     sql: `
       SELECT id, client_id, campaign_id, platform, severity, kind, title, detail,
              metric_value, threshold_value, status, acknowledged_by, acknowledged_at,
-             resolved_at, created_at
+             resolved_at, reopened_count, created_at
       FROM cd_alerts
       WHERE ${where.join(' AND ')}
       ORDER BY
@@ -61,6 +61,7 @@ export async function GET(request: NextRequest) {
     acknowledgedBy: row.acknowledged_by != null ? Number(row.acknowledged_by) : null,
     acknowledgedAt: (row.acknowledged_at as string | null) ?? null,
     resolvedAt: (row.resolved_at as string | null) ?? null,
+    reopenedCount: row.reopened_count != null ? Number(row.reopened_count) : 0,
     createdAt: String(row.created_at),
   }));
 
