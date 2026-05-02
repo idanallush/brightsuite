@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
+import useSWR from "swr";
 import { Eye, EyeOff, Filter, ChevronsDownUp, ChevronsUpDown, Bookmark, Trash2, Save, LayoutGrid, TableProperties } from "lucide-react";
 import type { ClientCardData, CpaStatus } from "@/lib/cpa/types/dashboard";
 import { ClientCard } from "@/components/cpa/dashboard/client-card";
@@ -29,9 +30,51 @@ import {
   DialogClose,
 } from "@/components/cpa/ui/dialog";
 
-interface SavedView {
-  name: string;
+// Server-backed saved view. payload carries the per-view UI state — currently
+// just the visible client-id list, but kept open for future fields (sort/etc.).
+interface SavedViewPayload {
   clientIds: string[];
+}
+
+interface SavedView {
+  id: number;
+  name: string;
+  payload: SavedViewPayload;
+  isDefault: boolean;
+}
+
+const VIEWS_ENDPOINT = "/api/cpa/views";
+const LEGACY_VIEWS_KEY = "cpa-saved-views";
+const LEGACY_MIGRATED_FLAG = "cpa-saved-views-migrated";
+
+interface RawServerView {
+  id: number;
+  name: string;
+  payload: unknown;
+  isDefault: boolean;
+}
+
+function normalizeServerView(raw: RawServerView): SavedView {
+  const p = raw.payload as { clientIds?: unknown } | null;
+  const clientIds =
+    p && Array.isArray(p.clientIds) ? p.clientIds.filter((x): x is string => typeof x === "string") : [];
+  return {
+    id: raw.id,
+    name: raw.name,
+    payload: { clientIds },
+    isDefault: Boolean(raw.isDefault),
+  };
+}
+
+async function viewsFetcher(url: string): Promise<SavedView[]> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    // Fall back to empty list rather than throwing — keeps the dashboard render
+    // path alive when the views endpoint is unreachable.
+    return [];
+  }
+  const data = (await res.json().catch(() => ({}))) as { views?: RawServerView[] };
+  return Array.isArray(data.views) ? data.views.map(normalizeServerView) : [];
 }
 
 function getHiddenCards(): Set<string> {
@@ -62,17 +105,25 @@ function setCollapsedCards(ids: Set<string>) {
   localStorage.setItem("cpa-collapsed-cards", JSON.stringify([...ids]));
 }
 
-function getSavedViews(): SavedView[] {
+// Read legacy localStorage views; tolerant to the old shape `{ name, clientIds }`.
+function readLegacyViews(): { name: string; clientIds: string[] }[] {
   try {
-    const stored = localStorage.getItem("cpa-saved-views");
-    return stored ? JSON.parse(stored) : [];
+    const stored = localStorage.getItem(LEGACY_VIEWS_KEY);
+    if (!stored) return [];
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter(
+        (v): v is { name: string; clientIds: string[] } =>
+          v && typeof v.name === "string" && Array.isArray(v.clientIds),
+      )
+      .map((v) => ({
+        name: v.name,
+        clientIds: v.clientIds.filter((x: unknown): x is string => typeof x === "string"),
+      }));
   } catch {
     return [];
   }
-}
-
-function setSavedViews(views: SavedView[]) {
-  localStorage.setItem("cpa-saved-views", JSON.stringify(views));
 }
 
 type ViewMode = "grid" | "table";
@@ -131,19 +182,85 @@ interface DashboardGridProps {
 export function DashboardGrid({ cards }: DashboardGridProps) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [savedViews, setSavedViewsState] = useState<SavedView[]>([]);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [newViewName, setNewViewName] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
   const [sortOption, setSortOption] = useState<SortOption>("default");
 
-  // Load from localStorage on mount
+  // Server-driven saved views via SWR. Fallback path: on fetch failure we
+  // surface an empty list so the rest of the dashboard still renders.
+  const {
+    data: savedViews = [],
+    mutate: mutateViews,
+  } = useSWR<SavedView[]>(VIEWS_ENDPOINT, viewsFetcher, {
+    revalidateOnFocus: false,
+  });
+
+  // Load per-device UI state from localStorage on mount (hidden / collapsed /
+  // viewMode stay local — they're per-device, not per-user).
   useEffect(() => {
     setHidden(getHiddenCards());
     setCollapsed(getCollapsedCards());
-    setSavedViewsState(getSavedViews());
     setViewMode(getViewMode());
   }, []);
+
+  // One-shot localStorage → server migration. Runs after the SWR fetch resolves.
+  // Logic:
+  //   1. If server already has views → set the migrated flag and skip (covers
+  //      the "server has views but legacy flag is missing" case — e.g. user
+  //      already migrated on another device and now hits a fresh browser).
+  //   2. If server is empty AND the migrated flag isn't set AND localStorage
+  //      has legacy views → POST them as a batch, then delete the legacy key.
+  //   3. Either way, set the migrated flag so we don't re-attempt on next load.
+  useEffect(() => {
+    if (savedViews === undefined) return; // SWR still loading
+    if (typeof window === "undefined") return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        if (localStorage.getItem(LEGACY_MIGRATED_FLAG) === "1") return;
+
+        if (savedViews.length > 0) {
+          localStorage.setItem(LEGACY_MIGRATED_FLAG, "1");
+          localStorage.removeItem(LEGACY_VIEWS_KEY);
+          return;
+        }
+
+        const legacy = readLegacyViews();
+        if (legacy.length === 0) {
+          localStorage.setItem(LEGACY_MIGRATED_FLAG, "1");
+          return;
+        }
+
+        const res = await fetch(VIEWS_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            views: legacy.map((v) => ({
+              name: v.name,
+              payload: { clientIds: v.clientIds },
+              isDefault: false,
+            })),
+          }),
+        });
+        if (cancelled) return;
+        if (res.ok) {
+          localStorage.setItem(LEGACY_MIGRATED_FLAG, "1");
+          localStorage.removeItem(LEGACY_VIEWS_KEY);
+          await mutateViews();
+        }
+      } catch (err) {
+        console.warn("[cpa] saved-views migration failed:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // We only want this to run once SWR has produced its first value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedViews.length === 0]);
 
   function handleViewModeChange(mode: ViewMode) {
     setViewMode(mode);
@@ -204,28 +321,71 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
     setHiddenCards(allIds);
   }
 
-  function handleSaveView() {
-    if (!newViewName.trim()) return;
+  async function handleSaveView() {
+    const name = newViewName.trim();
+    if (!name) return;
     const visibleIds = cards.filter((c) => !hidden.has(c.client_id)).map((c) => c.client_id);
-    const newView: SavedView = { name: newViewName.trim(), clientIds: visibleIds };
-    const updated = [...savedViews, newView];
-    setSavedViewsState(updated);
-    setSavedViews(updated);
+    const optimistic: SavedView = {
+      id: -Date.now(),
+      name,
+      payload: { clientIds: visibleIds },
+      isDefault: false,
+    };
+
     setNewViewName("");
     setSaveDialogOpen(false);
+
+    try {
+      await mutateViews(
+        async (current = []) => {
+          const res = await fetch(VIEWS_ENDPOINT, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name,
+              payload: { clientIds: visibleIds },
+              isDefault: false,
+            }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          const body = (await res.json()) as { view: RawServerView };
+          return [...current.filter((v) => v.id !== optimistic.id), normalizeServerView(body.view)];
+        },
+        {
+          optimisticData: (current = []) => [...current, optimistic],
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+    } catch (err) {
+      console.warn("[cpa] save view failed:", err);
+    }
   }
 
   function applyView(view: SavedView) {
-    const visibleSet = new Set(view.clientIds);
+    const visibleSet = new Set(view.payload.clientIds);
     const newHidden = new Set(cards.filter((c) => !visibleSet.has(c.client_id)).map((c) => c.client_id));
     setHidden(newHidden);
     setHiddenCards(newHidden);
   }
 
-  function deleteView(index: number) {
-    const updated = savedViews.filter((_, i) => i !== index);
-    setSavedViewsState(updated);
-    setSavedViews(updated);
+  async function deleteView(viewId: number) {
+    try {
+      await mutateViews(
+        async (current = []) => {
+          const res = await fetch(`${VIEWS_ENDPOINT}/${viewId}`, { method: "DELETE" });
+          if (!res.ok && res.status !== 404) throw new Error(await res.text());
+          return current.filter((v) => v.id !== viewId);
+        },
+        {
+          optimisticData: (current = []) => current.filter((v) => v.id !== viewId),
+          rollbackOnError: true,
+          revalidate: false,
+        },
+      );
+    } catch (err) {
+      console.warn("[cpa] delete view failed:", err);
+    }
   }
 
   const visibleCards = useMemo(() => cards.filter((c) => !hidden.has(c.client_id)), [cards, hidden]);
@@ -324,9 +484,9 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
                 </div>
               ) : (
                 <div className="p-2 space-y-0.5 max-h-48 overflow-y-auto">
-                  {savedViews.map((view, idx) => (
+                  {savedViews.map((view) => (
                     <div
-                      key={idx}
+                      key={view.id}
                       className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-50 group"
                     >
                       <button
@@ -335,12 +495,12 @@ export function DashboardGrid({ cards }: DashboardGridProps) {
                       >
                         {view.name}
                         <span className="text-[10px] text-muted-foreground ms-1">
-                          ({view.clientIds.length})
+                          ({view.payload.clientIds.length})
                         </span>
                       </button>
                       <button
                         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity"
-                        onClick={() => deleteView(idx)}
+                        onClick={() => deleteView(view.id)}
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>

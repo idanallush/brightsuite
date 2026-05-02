@@ -294,6 +294,22 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_cd_alerts_client_status ON cd_alerts(client_id, status, severity);
     CREATE INDEX IF NOT EXISTS idx_cd_views_user ON cd_user_views(user_id, scope);
 
+    -- CPA Dashboard: per-user saved views (filters / hidden client-id sets / sort).
+    -- Mirrors cd_user_views but scoped to a single surface so we omit the scope column.
+    -- payload is opaque JSON owned by the CPA dashboard front-end.
+    CREATE TABLE IF NOT EXISTS cpa_user_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES bs_users(id) ON DELETE CASCADE,
+      name TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      is_default INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(user_id, name)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_cpa_views_user ON cpa_user_views(user_id);
+
     -- PPC Retainer Manager: agency clients on retainer
     CREATE TABLE IF NOT EXISTS pr_clients (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
