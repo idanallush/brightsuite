@@ -11,6 +11,15 @@ interface RawClientsResponse {
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
+// Parse a 'YYYY-MM-DD' string as local midnight — avoids UTC drift on
+// last day of month (memory: feedback_budgetflow-date-parsing).
+const parseLocal = (s: string): Date => {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+};
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
 export const BackfillForm = () => {
   const { data } = useSWR<RawClientsResponse>('/api/clients-dashboard/clients?raw=1', fetcher);
   const clients = data?.clients || [];
@@ -25,6 +34,48 @@ export const BackfillForm = () => {
     if (!clientId || !startDate || !endDate) {
       toast.error('כל השדות הם חובה');
       return;
+    }
+
+    const start = parseLocal(startDate);
+    const end = parseLocal(endDate);
+
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      toast.error('תאריך לא תקין');
+      return;
+    }
+
+    if (start > end) {
+      toast.error('תאריך התחלה חייב להיות לפני תאריך סיום');
+      return;
+    }
+
+    const rangeDays = Math.floor((end.getTime() - start.getTime()) / MS_PER_DAY) + 1;
+    if (rangeDays > 730) {
+      toast.error('טווח התאריכים חורג מ-730 ימים (שנתיים)');
+      return;
+    }
+
+    // Verify the selected client is actually connected to the selected platform.
+    const selected = clients.find((c) => Number(c.id) === Number(clientId));
+    if (!selected) {
+      toast.error('הלקוח לא נמצא');
+      return;
+    }
+    const hasMeta = Boolean(selected.meta_account_id);
+    const hasGoogle = Boolean(selected.google_customer_id);
+    const hasGa4 = Boolean(selected.ga4_property_id);
+    const platformConnected =
+      (platform === 'meta' && hasMeta) ||
+      (platform === 'google' && hasGoogle) ||
+      (platform === 'ga4' && hasGa4);
+    if (!platformConnected) {
+      toast.error('הלקוח לא מחובר לפלטפורמה הזו');
+      return;
+    }
+
+    if (rangeDays > 90) {
+      const ok = window.confirm('טווח רחב — הסנכרון עשוי להימשך מספר דקות. להמשיך?');
+      if (!ok) return;
     }
 
     setLoading(true);

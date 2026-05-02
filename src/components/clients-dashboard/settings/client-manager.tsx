@@ -1,11 +1,89 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import useSWR from 'swr';
 import { Plus, RefreshCw, ChevronDown, Loader2, Pencil, Trash2, X, Check, AlertTriangle } from 'lucide-react';
 import { useFacebookAccounts } from '@/hooks/clients-dashboard/use-facebook-accounts';
 import { useGoogleAccounts } from '@/hooks/clients-dashboard/use-google-accounts';
 import { toast } from 'sonner';
+
+// Slug format: lowercase letters, digits, hyphens. Length 2-40.
+const SLUG_RE = /^[a-z0-9-]+$/;
+// Meta accepts either `act_\d+` or bare `\d+`.
+const META_RE = /^(act_)?\d+$/;
+// GA4 property id is numeric.
+const GA4_RE = /^\d+$/;
+// Google customer_id is 10 digits (we strip dashes for tolerant input).
+const GOOGLE_RE = /^\d{10}$/;
+const stripDashes = (s: string) => s.replace(/-/g, '');
+
+interface ValidateInput {
+  form: ClientFormData;
+  clients: Record<string, unknown>[];
+  excludeId: number | null;
+}
+
+interface ValidateResult {
+  ok: boolean;
+  error?: string;
+  metaDuplicate?: boolean;
+  googleDuplicate?: boolean;
+}
+
+function validateClientForm({ form, clients, excludeId }: ValidateInput): ValidateResult {
+  // Slug format + length (skipped for edits where slug field isn't shown).
+  if (form.slug) {
+    if (form.slug.length < 2 || form.slug.length > 40) {
+      return { ok: false, error: 'slug חייב להיות באורך 2 עד 40 תווים' };
+    }
+    if (!SLUG_RE.test(form.slug)) {
+      return { ok: false, error: 'slug חייב להכיל רק אותיות קטנות, ספרות ומקפים' };
+    }
+    const slugTaken = clients.some(
+      (c) => (c.slug as string) === form.slug && Number(c.id) !== excludeId,
+    );
+    if (slugTaken) {
+      return { ok: false, error: 'ה-slug הזה כבר בשימוש על ידי לקוח אחר' };
+    }
+  }
+
+  // At least one platform account must be filled.
+  if (!form.metaAccountId && !form.googleCustomerId && !form.ga4PropertyId) {
+    return { ok: false, error: 'יש להזין לפחות חשבון פלטפורמה אחד' };
+  }
+
+  // Format checks.
+  if (form.metaAccountId && !META_RE.test(form.metaAccountId)) {
+    return { ok: false, error: 'מזהה חשבון Meta חייב להיות בפורמט act_123456789 או 123456789' };
+  }
+  const googleNormalized = stripDashes(form.googleCustomerId);
+  if (form.googleCustomerId && !GOOGLE_RE.test(googleNormalized)) {
+    return { ok: false, error: 'מזהה לקוח Google חייב להיות 10 ספרות (לדוגמה 1234567890)' };
+  }
+  if (form.ga4PropertyId && !GA4_RE.test(form.ga4PropertyId)) {
+    return { ok: false, error: 'מזהה GA4 Property חייב להיות מספרי בלבד' };
+  }
+
+  // Cross-client duplicate-account check (warning, not block).
+  const metaDuplicate = Boolean(
+    form.metaAccountId &&
+      clients.some(
+        (c) =>
+          (c.meta_account_id as string) === form.metaAccountId &&
+          Number(c.id) !== excludeId,
+      ),
+  );
+  const googleDuplicate = Boolean(
+    form.googleCustomerId &&
+      clients.some(
+        (c) =>
+          (c.google_customer_id as string) === form.googleCustomerId &&
+          Number(c.id) !== excludeId,
+      ),
+  );
+
+  return { ok: true, metaDuplicate, googleDuplicate };
+}
 
 interface SessionResponse {
   authenticated: boolean;
@@ -48,18 +126,60 @@ export const ClientManager = () => {
   });
   const isAdmin = sessionData?.user?.role === 'admin';
 
-  const { accounts: fbAccounts, isLoading: fbLoading } = useFacebookAccounts();
-  const { accounts: googleAccounts, mccId: googleMccId, isLoading: googleLoading } = useGoogleAccounts();
+  const { accounts: fbAccounts, isLoading: fbLoading, error: fbError } = useFacebookAccounts();
+  const { accounts: googleAccounts, mccId: googleMccId, isLoading: googleLoading, error: googleError } = useGoogleAccounts();
+
+  // Surface load errors once per error instance (not on every re-render).
+  const fbErrorShown = useRef<Error | null>(null);
+  const googleErrorShown = useRef<Error | null>(null);
+  useEffect(() => {
+    if (fbError && fbErrorShown.current !== fbError) {
+      fbErrorShown.current = fbError;
+      const detail = fbError.message ? `: ${fbError.message}` : '';
+      toast.error(`שגיאה בטעינת חשבונות פייסבוק${detail}`);
+    }
+  }, [fbError]);
+  useEffect(() => {
+    if (googleError && googleErrorShown.current !== googleError) {
+      googleErrorShown.current = googleError;
+      const detail = googleError.message ? `: ${googleError.message}` : '';
+      toast.error(`שגיאה בטעינת חשבונות Google${detail}`);
+    }
+  }, [googleError]);
 
   const [showForm, setShowForm] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [form, setForm] = useState<ClientFormData>(emptyForm);
+  // Tracks whether the user has acknowledged a cross-client account-id
+  // duplication warning by clicking save a second time.
+  const [duplicateAck, setDuplicateAck] = useState(false);
+
+  // Any change to the relevant ids invalidates a previous acknowledgment.
+  useEffect(() => {
+    setDuplicateAck(false);
+  }, [form.metaAccountId, form.googleCustomerId]);
 
   const handleAdd = async () => {
     if (!form.name || !form.slug) {
       toast.error('שם ו-slug הם שדות חובה');
+      return;
+    }
+
+    const v = validateClientForm({ form, clients, excludeId: null });
+    if (!v.ok) {
+      toast.error(v.error || 'שגיאת ולידציה');
+      return;
+    }
+    if ((v.metaDuplicate || v.googleDuplicate) && !duplicateAck) {
+      const which = v.metaDuplicate && v.googleDuplicate
+        ? 'Meta ו-Google'
+        : v.metaDuplicate
+          ? 'Meta'
+          : 'Google';
+      toast.warning(`חשבון ${which} כבר משויך ללקוח אחר. לחץ "שמור" שוב לאישור.`);
+      setDuplicateAck(true);
       return;
     }
 
@@ -79,6 +199,7 @@ export const ClientManager = () => {
       toast.success('לקוח נוסף בהצלחה');
       setShowForm(false);
       setForm(emptyForm);
+      setDuplicateAck(false);
       mutate();
     } catch {
       toast.error('שגיאה ביצירת לקוח');
@@ -105,6 +226,22 @@ export const ClientManager = () => {
       return;
     }
 
+    const v = validateClientForm({ form, clients, excludeId: editingId });
+    if (!v.ok) {
+      toast.error(v.error || 'שגיאת ולידציה');
+      return;
+    }
+    if ((v.metaDuplicate || v.googleDuplicate) && !duplicateAck) {
+      const which = v.metaDuplicate && v.googleDuplicate
+        ? 'Meta ו-Google'
+        : v.metaDuplicate
+          ? 'Meta'
+          : 'Google';
+      toast.warning(`חשבון ${which} כבר משויך ללקוח אחר. לחץ "שמור שינויים" שוב לאישור.`);
+      setDuplicateAck(true);
+      return;
+    }
+
     try {
       const res = await fetch(`/api/clients-dashboard/clients/${editingId}`, {
         method: 'PUT',
@@ -121,6 +258,7 @@ export const ClientManager = () => {
       toast.success('לקוח עודכן בהצלחה');
       setEditingId(null);
       setForm(emptyForm);
+      setDuplicateAck(false);
       mutate();
     } catch {
       toast.error('שגיאה בעדכון לקוח');
@@ -180,6 +318,7 @@ export const ClientManager = () => {
   const cancelEdit = () => {
     setEditingId(null);
     setForm(emptyForm);
+    setDuplicateAck(false);
   };
 
   const selectStyle = {
@@ -399,6 +538,7 @@ export const ClientManager = () => {
             setShowForm(!showForm);
             setEditingId(null);
             setForm(emptyForm);
+            setDuplicateAck(false);
           }}
           className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors"
           style={{ background: 'var(--accent)', color: '#1a1a1a' }}
@@ -435,7 +575,7 @@ export const ClientManager = () => {
               שמור
             </button>
             <button
-              onClick={() => { setShowForm(false); setForm(emptyForm); }}
+              onClick={() => { setShowForm(false); setForm(emptyForm); setDuplicateAck(false); }}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border"
               style={{ borderColor: 'var(--glass-border)', color: 'var(--text-secondary)' }}
             >

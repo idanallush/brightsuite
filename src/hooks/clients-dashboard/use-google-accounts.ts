@@ -15,7 +15,10 @@ interface GoogleAccountsResponse {
 
 const fetcher = async (url: string): Promise<GoogleAccountsResponse> => {
   const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch Google accounts');
+  // 401 means the user hasn't connected Google yet — treat as empty list,
+  // not an error (avoids spurious "load failed" toasts on first visit).
+  if (res.status === 401) return { accounts: [] };
+  if (!res.ok) throw new Error(`Failed to fetch Google accounts (${res.status})`);
   return res.json();
 };
 
@@ -29,7 +32,7 @@ export function useGoogleAccounts() {
   return {
     accounts: data?.accounts || [],
     mccId: data?.mccId || '',
-    error,
+    error: error as Error | undefined,
     isLoading,
   };
 }
