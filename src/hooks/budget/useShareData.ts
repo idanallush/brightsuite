@@ -28,19 +28,21 @@ export const useShareData = (token: string) => {
         budget_periods: BudgetPeriod[]
       }
 
-      const enrichedCampaigns = data.campaigns.map((campaign) => {
-        const periods = data.budget_periods
-          .filter((p) => p.campaign_id === campaign.id)
-          .map((p) => ({ ...p, daily_budget: Number(p.daily_budget) }))
+      const enrichedCampaigns = data.campaigns
+        .map((campaign) => {
+          const periods = data.budget_periods
+            .filter((p) => p.campaign_id === campaign.id)
+            .map((p) => ({ ...p, daily_budget: Number(p.daily_budget) }))
 
-        const enriched = enrichCampaignWithBudget(campaign, periods)
+          const enriched = enrichCampaignWithBudget(campaign, periods)
 
-        const spendMonth = campaign.actual_spend_month
-        if (Number(campaign.actual_spend) > 0 && (!spendMonth || spendMonth !== currentMonth)) {
-          return { ...enriched, actual_spend: 0 }
-        }
-        return enriched
-      })
+          const spendMonth = campaign.actual_spend_month
+          if (Number(campaign.actual_spend) > 0 && (!spendMonth || spendMonth !== currentMonth)) {
+            return { ...enriched, actual_spend: 0 }
+          }
+          return enriched
+        })
+        .filter((c) => Number(c.actual_spend) > 0 || c.current_daily_budget > 0)
 
       return { client: data.client, campaigns: enrichedCampaigns }
     },
