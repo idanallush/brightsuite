@@ -42,7 +42,7 @@ export const useShareData = (token: string) => {
           }
           return enriched
         })
-        .filter((c) => Number(c.actual_spend) > 0 || c.current_daily_budget > 0)
+        .filter((c) => c.status !== 'paused' && (Number(c.actual_spend) > 0 || c.current_daily_budget > 0))
 
       return { client: data.client, campaigns: enrichedCampaigns }
     },
